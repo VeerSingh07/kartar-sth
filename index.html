@@ -110,7 +110,10 @@
             const dbPayload = { version: 'KartarSportsDB_v4', updatedAt: new Date().toISOString(), products, suppliers, revisions: revisionIndex };
             const jsonStr = JSON.stringify(dbPayload, null, 2);
             localStorage.setItem('kartar_master_db_backup', jsonStr);
-            try { await fetch('http://localhost:3001/api/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: jsonStr }); } catch (e) {}
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (isLocal) {
+              try { await fetch('http://localhost:3001/api/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: jsonStr }); } catch (e) {}
+            }
           } catch (e) {}
         };
       }
@@ -137,15 +140,27 @@
           if (!window.db) return;
           let existingCount = await window.db.products.count();
           let physicalData = null;
-          try { const res = await fetch('http://localhost:3001/api/db'); if (res.ok) physicalData = await res.json(); } catch (err) {
-            try { const res = await fetch('data/database_file.json'); if (res.ok) physicalData = await res.json(); } catch (e) {}
+          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+          if (isLocal) {
+            try { const res = await fetch('http://localhost:3001/api/db'); if (res.ok) physicalData = await res.json(); } catch (err) {}
           }
+
+          if (!physicalData) {
+            if (window.PHYSICAL_DATABASE_FILE && window.PHYSICAL_DATABASE_FILE.products) {
+              physicalData = window.PHYSICAL_DATABASE_FILE;
+            } else {
+              try { const res = await fetch('data/database_file.json'); if (res.ok) physicalData = await res.json(); } catch (e) {}
+            }
+          }
+
           if (physicalData && physicalData.products && Array.isArray(physicalData.products)) {
             if (existingCount === 0 || existingCount !== physicalData.products.length) {
               await window.importPhysicalData(physicalData);
               return;
             }
           }
+
           if (existingCount > 0) return;
           let localBackup = localStorage.getItem('kartar_master_db_backup');
           if (localBackup) { try { await window.importPhysicalData(JSON.parse(localBackup)); } catch (e) {} }

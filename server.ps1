@@ -8,7 +8,7 @@ $listener.Prefixes.Add("http://localhost:$port/")
 try {
     $listener.Start()
     Write-Host "=================================================================="
-    Write-Host "  Kartar Sports Optimized Multi-File Persistence Server Running!"
+    Write-Host "  Kartar Sports Multi-File Persistence Server Running!"
     Write-Host "  App URL: http://localhost:$port/index.html"
     Write-Host "  Admin URL: http://localhost:$port/admin.html"
     Write-Host "  Revision Commits Directory: data/revisions/"
@@ -19,6 +19,7 @@ try {
 }
 
 $dbPath        = "d:\Sukhwinder Singh\Billing Management\data\database_file.json"
+$dbJsPath      = "d:\Sukhwinder Singh\Billing Management\data\database_file.js"
 $revisionsDir  = "d:\Sukhwinder Singh\Billing Management\data\revisions"
 $rootPath      = "d:\Sukhwinder Singh\Billing Management"
 
@@ -31,10 +32,11 @@ while ($listener.IsListening) {
     $request = $context.Request
     $response = $context.Response
     
-    # Enable CORS
+    # Enable CORS & Private Network Access
     $response.AddHeader("Access-Control-Allow-Origin", "*")
     $response.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
     $response.AddHeader("Access-Control-Allow-Headers", "Content-Type")
+    $response.AddHeader("Access-Control-Allow-Private-Network", "true")
 
     if ($request.HttpMethod -eq "OPTIONS") {
         $response.StatusCode = 200
@@ -57,7 +59,7 @@ while ($listener.IsListening) {
                 $response.StatusCode = 404
             }
         }
-        # POST /api/save - Saves active database directly to data/database_file.json
+        # POST /api/save - Saves active database directly to data/database_file.json and data/database_file.js
         elseif ($urlPath -eq "/api/save" -and $request.HttpMethod -eq "POST") {
             $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
             $body = $reader.ReadToEnd()
@@ -65,7 +67,9 @@ while ($listener.IsListening) {
 
             if ($body -and $body.Length -gt 10) {
                 Set-Content -Path $dbPath -Value $body -Encoding UTF8
-                Write-Host "[MAIN DB PERSIST] Saved active database update to data/database_file.json!"
+                $jsContent = "window.PHYSICAL_DATABASE_FILE = $body;"
+                Set-Content -Path $dbJsPath -Value $jsContent -Encoding UTF8
+                Write-Host "[MAIN DB PERSIST] Saved active database update to data/database_file.json and database_file.js!"
 
                 $resText = '{"success": true, "message": "Main database file saved!"}'
                 $buffer = [System.Text.Encoding]::UTF8.GetBytes($resText)

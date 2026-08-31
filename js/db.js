@@ -114,16 +114,19 @@ async function syncToPhysicalFile() {
     // Save to LocalStorage persistent cache
     localStorage.setItem('kartar_master_db_backup', jsonStr);
 
-    // Send live save request to Local Server
-    try {
-      await fetch('http://localhost:3001/api/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: jsonStr
-      });
-      console.log('[Disk Sync] Saved active database to data/database_file.json!');
-    } catch (e) {
-      console.log('[Disk Sync] Server offline or direct mode');
+    // Send live save request to Local Server (only if running on localhost)
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocalhost) {
+      try {
+        await fetch('http://localhost:3001/api/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: jsonStr
+        });
+        console.log('[Disk Sync] Saved active database to data/database_file.json!');
+      } catch (e) {
+        console.log('[Disk Sync] Local server offline');
+      }
     }
   } catch (err) {
     console.error('[Disk Sync] Warning:', err);
@@ -169,22 +172,28 @@ window.importPhysicalData = importPhysicalData;
 // --- DATABASE PERSISTENCE INITIALIZATION ENGINE ---
 async function initDatabaseIfNeeded() {
   let existingCount = await db.products.count();
-
   let physicalData = null;
 
-  // 1st Priority: Try fetching main database from Local Server
-  try {
-    const res = await fetch('http://localhost:3001/api/db');
-    if (res.ok) {
-      physicalData = await res.json();
-    }
-  } catch (err) {
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+  // 1st Priority: Try fetching main database from Local Server if on localhost
+  if (isLocalhost) {
     try {
-      const res = await fetch('data/database_file.json');
-      if (res.ok) {
-        physicalData = await res.json();
-      }
-    } catch (e) {}
+      const res = await fetch('http://localhost:3001/api/db');
+      if (res.ok) physicalData = await res.json();
+    } catch (err) {}
+  }
+
+  // 2nd Priority: Fetch data/database_file.json or window.PHYSICAL_DATABASE_FILE
+  if (!physicalData) {
+    if (window.PHYSICAL_DATABASE_FILE && window.PHYSICAL_DATABASE_FILE.products) {
+      physicalData = window.PHYSICAL_DATABASE_FILE;
+    } else {
+      try {
+        const res = await fetch('data/database_file.json');
+        if (res.ok) physicalData = await res.json();
+      } catch (e) {}
+    }
   }
 
   if (physicalData && physicalData.products && Array.isArray(physicalData.products)) {
@@ -199,7 +208,7 @@ async function initDatabaseIfNeeded() {
     return;
   }
 
-  // 2nd Priority: LocalStorage backup
+  // 3rd Priority: LocalStorage backup
   let localBackup = localStorage.getItem('kartar_master_db_backup');
   if (localBackup) {
     try {
