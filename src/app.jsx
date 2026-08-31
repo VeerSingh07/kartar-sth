@@ -1,0 +1,1420 @@
+// Kartar Sports and Toys House - Retail Price Manager & Price Checker Portal
+// Features Dual Operating Modes:
+// 1. 🛠️ Admin Mode: Full management (Wholesale costs, margins, profits, stock, reports, settings)
+// 2. 🏷️ Retail Price Checker Mode: Simplified counter mode (Only Product S.N., SKU, Name & Retail MRP)
+
+const { useState, useEffect, useMemo, useRef } = React;
+
+// --- INDEXEDDB DATABASE SETUP ---
+const db = new Dexie('KartarSportsDB');
+db.version(3).stores({
+  products: '++id, catalogTag, itemNo, name, sku, category, brand, supplierId, retailPrice, wholesalePrice, currentQuantity, minStockAlert, updatedAt',
+  suppliers: '++id, name, phone, address',
+  settings: 'key, value'
+});
+
+// --- DEFAULT CATEGORIES ---
+const DEFAULT_CATEGORIES = {
+  Sports: [
+    'Cricket', 'Football', 'Basketball', 'Volleyball', 'Badminton', 
+    'Table Tennis', 'Tennis', 'Hockey', 'Sports Accessories', 
+    'Fitness', 'Outdoor Games', 'Indoor Games'
+  ],
+  Toys: [
+    'Big Toys', 'Small Toys', 'Cars', 'Remote Control Toys', 'Dolls', 'Soft Toys', 
+    'Educational Toys', 'Board Games', 'Building Toys', 
+    'Outdoor Toys', 'Baby Toys', 'Action Figures', 'Musical Toys', 'Other Toys'
+  ]
+};
+
+// --- DEFAULT SETTINGS ---
+const DEFAULT_APP_SETTINGS = {
+  shopName: 'Kartar Sports and Toys House',
+  shopAddress: 'Main Market, Sports Hub, City Center',
+  shopPhone: '+91 98765 43210',
+  gstNumber: '03AAAAA0000A1Z5',
+  currency: '₹',
+  defaultPricingMethod: 'margin',
+  defaultMarkup: 25,
+  defaultMargin: 25,
+  defaultRounding: 'nearest5'
+};
+
+// --- BIG TOYS CATALOG (37 ITEMS FROM CHALLAN SL1-56,701 DATED 26/AUG/2026) ---
+const BIG_TOYS_PRODUCTS = [
+  { itemNo: 1, name: 'T/CHAIR (C)', sku: 'BIG1', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'Generic', wholesalePrice: 390, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 520, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 2, name: 'CARROM T/ZONE SMALL', sku: 'BIG2', catalogTag: 'Big Toys', category: 'Board Games', brand: 'T/ZONE', wholesalePrice: 250, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 335, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 3, name: 'RAIRA 040 MUSICAL TOYZOY', sku: 'BIG3', catalogTag: 'Big Toys', category: 'Educational Toys', brand: 'TOYZOY', wholesalePrice: 610, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 815, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 4, name: 'BATH TUB BHASIN', sku: 'BIG4', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'BHASIN', wholesalePrice: 500, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 670, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 5, name: 'TENT BHASIN.', sku: 'BIG5', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'BHASIN', wholesalePrice: 485, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 650, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 6, name: 'TENT S/C SQUARE', sku: 'BIG6', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'Generic', wholesalePrice: 390, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 520, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 7, name: 'P WAGON RIDER PANDA', sku: 'BIG7', catalogTag: 'Big Toys', category: 'Cars', brand: 'PANDA', wholesalePrice: 1175, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1570, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 8, name: 'CARRY COT 10 IN 1 FIRST CRAWL', sku: 'BIG8', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'FIRST CRAWL', wholesalePrice: 920, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1230, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 9, name: 'MICKEY RIDER MAMA LOVE', sku: 'BIG9', catalogTag: 'Big Toys', category: 'Cars', brand: 'MAMA LOVE', wholesalePrice: 590, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 790, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 10, name: 'PRAM GIAN C/W', sku: 'BIG10', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'GIAN', wholesalePrice: 1475, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1970, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 11, name: 'PRAM KARTZ PLAIN', sku: 'BIG11', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'KARTZ', wholesalePrice: 2250, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 3000, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 12, name: 'BIG REW GYAN', sku: 'BIG12', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'GYAN', wholesalePrice: 1025, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1370, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 13, name: 'TRICYCLE 551 TOYZOY', sku: 'BIG13', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'TOYZOY', wholesalePrice: 1300, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1735, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 14, name: 'TRICYCLE 552 TOYZOY', sku: 'BIG14', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'TOYZOY', wholesalePrice: 1560, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 2080, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 15, name: 'TRICYCLE 0001 TOYZOY', sku: 'BIG15', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'TOYZOY', wholesalePrice: 785, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1050, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 16, name: 'TRICYCLE 0002 TOYZOY', sku: 'BIG16', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'TOYZOY', wholesalePrice: 1025, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1370, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 17, name: 'CYCLE BULLET SKY INDIA B/W', sku: 'BIG17', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'SKY INDIA', wholesalePrice: 775, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1035, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 18, name: 'B/JHULLA A/W MINI', sku: 'BIG18', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'A/W', wholesalePrice: 675, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 900, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 19, name: 'B/JHULLA A/W SR', sku: 'BIG19', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'A/W', wholesalePrice: 975, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1300, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 20, name: 'SWING CHEAP LKW', sku: 'BIG20', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'LKW', wholesalePrice: 150, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 200, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 21, name: 'SWING ECO', sku: 'BIG21', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'ECO', wholesalePrice: 250, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 335, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 22, name: 'WALKER TINY MAMALOVE', sku: 'BIG22', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'MAMALOVE', wholesalePrice: 925, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1235, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 23, name: 'M/CAR 4006 TOYZOY', sku: 'BIG23', catalogTag: 'Big Toys', category: 'Cars', brand: 'TOYZOY', wholesalePrice: 835, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1115, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 24, name: 'WALKER 8 BAND GRIP TUTY MUSIC MAMALOVE', sku: 'BIG24', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'MAMALOVE', wholesalePrice: 330, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 440, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 25, name: 'SINGHAM WALKER 8 BAND GAJNI (M)', sku: 'BIG25', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'GAJNI', wholesalePrice: 375, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 500, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 26, name: 'WALKER KAT CAPSULE PIPE MAMALOVE', sku: 'BIG26', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'MAMALOVE', wholesalePrice: 390, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 520, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 27, name: 'CHETAK ROYAL', sku: 'BIG27', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'ROYAL', wholesalePrice: 430, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 575, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 28, name: 'QUACK PLAYWAY', sku: 'BIG28', catalogTag: 'Big Toys', category: 'Educational Toys', brand: 'PLAYWAY', wholesalePrice: 590, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 790, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 29, name: 'BOLT BIKE PANDA', sku: 'BIG29', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'PANDA', wholesalePrice: 1860, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 2480, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 30, name: 'CHUCHU HEAVY', sku: 'BIG30', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'Generic', wholesalePrice: 240, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 320, roundingMethod: 'nearest5', quantityPurchased: 4, currentQuantity: 4, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 31, name: 'RUNNER T/Z 2 NO.', sku: 'BIG31', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'T/Z', wholesalePrice: 930, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1240, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 32, name: 'BULLET RETRO ENFIELD LUUSA', sku: 'BIG32', catalogTag: 'Big Toys', category: 'Remote Control Toys', brand: 'LUUSA', wholesalePrice: 6500, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 8670, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 33, name: 'VESPA URBAN', sku: 'BIG33', catalogTag: 'Big Toys', category: 'Remote Control Toys', brand: 'URBAN', wholesalePrice: 4050, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 5400, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 34, name: 'BIKE HARLEY BUCKETS PLAYTOOL', sku: 'BIG34', catalogTag: 'Big Toys', category: 'Remote Control Toys', brand: 'PLAYTOOL', wholesalePrice: 2650, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 3535, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 35, name: 'JEEP 5005 4X4', sku: 'BIG35', catalogTag: 'Big Toys', category: 'Remote Control Toys', brand: '4X4', wholesalePrice: 4100, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 5470, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 36, name: 'JEEP HAIZER PLAYTOOL', sku: 'BIG36', catalogTag: 'Big Toys', category: 'Remote Control Toys', brand: 'PLAYTOOL', wholesalePrice: 5500, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 7335, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
+  { itemNo: 37, name: 'TRACTOR WITH TROLLY BIG', sku: 'BIG37', catalogTag: 'Big Toys', category: 'Remote Control Toys', brand: 'Generic', wholesalePrice: 8800, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 11735, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 }
+];
+
+// --- SMALL TOYS CATALOG (131 ITEMS FROM ESTIMATE SLM-0 DATED 26/AUG/2026 INCL 5 ADDED ITEMS) ---
+const SMALL_TOYS_PRODUCTS = [
+  { itemNo: 1, name: 'Melody Toy', sku: 'SML1', catalogTag: 'Small Toys', category: 'Musical Toys', brand: 'Generic', wholesalePrice: 145, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 195, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 2, name: 'Beach Set', sku: 'SML2', catalogTag: 'Small Toys', category: 'Outdoor Toys', brand: 'Generic', wholesalePrice: 375, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 500, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 3, name: 'Small Toy Car', sku: 'SML3', catalogTag: 'Small Toys', category: 'Cars', brand: 'Generic', wholesalePrice: 350, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 470, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 4, name: 'Play Gym Set', sku: 'SML4', catalogTag: 'Small Toys', category: 'Baby Toys', brand: 'Generic', wholesalePrice: 455, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 610, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 5, name: 'Soft Toy Dog', sku: 'SML5', catalogTag: 'Small Toys', category: 'Soft Toys', brand: 'Generic', wholesalePrice: 220, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 295, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 6, name: 'Action Car', sku: 'SML6', catalogTag: 'Small Toys', category: 'Cars', brand: 'Generic', wholesalePrice: 535, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 715, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 7, name: 'Cute Rabbit Toy', sku: 'SML7', catalogTag: 'Small Toys', category: 'Soft Toys', brand: 'Generic', wholesalePrice: 145, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 195, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 8, name: 'Puppy Dog Toy', sku: 'SML8', catalogTag: 'Small Toys', category: 'Soft Toys', brand: 'Generic', wholesalePrice: 155, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 210, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 9, name: 'Mini Racing Car', sku: 'SML9', catalogTag: 'Small Toys', category: 'Cars', brand: 'Generic', wholesalePrice: 145, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 195, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 10, name: 'J.C.B Dumper Toy', sku: 'SML10', catalogTag: 'Small Toys', category: 'Educational Toys', brand: 'Generic', wholesalePrice: 600, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 800, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 11, name: 'Rabbit Frog Toy', sku: 'SML11', catalogTag: 'Small Toys', category: 'Soft Toys', brand: 'Generic', wholesalePrice: 230, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 310, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 12, name: 'King Lion Toy', sku: 'SML12', catalogTag: 'Small Toys', category: 'Soft Toys', brand: 'Generic', wholesalePrice: 150, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 200, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 13, name: 'Rock Car Stunt Toy', sku: 'SML13', catalogTag: 'Small Toys', category: 'Remote Control Toys', brand: 'Generic', wholesalePrice: 435, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 580, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 14, name: 'Speed Car Toy', sku: 'SML14', catalogTag: 'Small Toys', category: 'Cars', brand: 'Generic', wholesalePrice: 500, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 670, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 15, name: 'Jelly Fish Toy', sku: 'SML15', catalogTag: 'Small Toys', category: 'Other Toys', brand: 'Generic', wholesalePrice: 120, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 160, roundingMethod: 'nearest5', quantityPurchased: 6, currentQuantity: 6, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 16, name: 'Doraemon Toy', sku: 'SML16', catalogTag: 'Small Toys', category: 'Action Figures', brand: 'Generic', wholesalePrice: 65, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 90, roundingMethod: 'nearest5', quantityPurchased: 12, currentQuantity: 12, minStockAlert: 2, supplierId: 2 },
+  { itemNo: 17, name: 'Stunt Bike Toy', sku: 'SML17', catalogTag: 'Small Toys', category: 'Remote Control Toys', brand: 'Generic', wholesalePrice: 880, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1175, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 18, name: 'Smart Robot Toy', sku: 'SML18', catalogTag: 'Small Toys', category: 'Educational Toys', brand: 'Generic', wholesalePrice: 390, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 520, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 19, name: 'Dinosaur Figure', sku: 'SML19', catalogTag: 'Small Toys', category: 'Action Figures', brand: 'Generic', wholesalePrice: 210, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 280, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 20, name: '3D Light Car', sku: 'SML20', catalogTag: 'Small Toys', category: 'Cars', brand: 'Generic', wholesalePrice: 165, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 220, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
+  ...Array.from({ length: 106 }, (_, idx) => {
+    const num = idx + 21;
+    const rates = [175,280,250,875,250,75,530,390,825,580,480,265,205,600,190,410,275,175,430,500,285,165,245,350,325,250,105,63,27,335,335,125,65,60,28,25,150,145,105,175,60,155,275,135,270,260,66,180,115,45,55,85,75,60,110,60,105,75,68,75,48,35,50,55,60,55,60,195,120,95,95,75,60,48,33,110,115,57,75,85,120,90,80,90,75,72,70,100,100,75,95,75,10,185,300,195,290,320,180,220,90,215,70,590,300,215];
+    const qtys = [2,1,1,1,1,2,1,2,1,1,1,1,1,2,2,1,3,2,1,1,1,2,2,1,1,1,2,6,12,1,1,2,2,6,2,2,1,1,2,3,1,4,2,2,2,2,3,1,2,2,2,2,2,2,1,2,1,2,2,2,1,2,4,2,2,1,1,1,1,1,2,2,2,2,1,1,1,2,2,2,2,2,2,2,4,2,2,2,2,2,1,1,4,1,2,1,1,2,1,2,2,1,2,1,1,2];
+    const wPrice = rates[idx] || 100;
+    const qVal = qtys[idx] || 1;
+    const rPrice = Math.round( (wPrice / 0.75) / 5 ) * 5;
+
+    return {
+      itemNo: num,
+      name: `Small Toy #${String(num).padStart(3, '0')}`,
+      sku: `SML${num}`,
+      catalogTag: 'Small Toys',
+      category: 'Small Toys',
+      brand: 'Generic',
+      wholesalePrice: wPrice,
+      additionalCost: 0,
+      pricingMethod: 'margin',
+      marginPercent: 25,
+      retailPrice: rPrice,
+      roundingMethod: 'nearest5',
+      quantityPurchased: qVal,
+      currentQuantity: qVal,
+      minStockAlert: 1,
+      supplierId: 2
+    };
+  }),
+  { itemNo: 127, name: 'Small Toy #127 (Special)', sku: 'SML127', catalogTag: 'Small Toys', category: 'Small Toys', brand: 'Generic', wholesalePrice: 370, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 495, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 128, name: 'Small Toy #128 (Special)', sku: 'SML128', catalogTag: 'Small Toys', category: 'Small Toys', brand: 'Generic', wholesalePrice: 225, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 300, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 129, name: 'Small Toy #129 (Special)', sku: 'SML129', catalogTag: 'Small Toys', category: 'Small Toys', brand: 'Generic', wholesalePrice: 315, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 420, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 130, name: 'Small Toy #130 (Special)', sku: 'SML130', catalogTag: 'Small Toys', category: 'Small Toys', brand: 'Generic', wholesalePrice: 310, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 415, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
+  { itemNo: 131, name: 'Previous Challan Subtotal Item (#005)', sku: 'SML131', catalogTag: 'Small Toys', category: 'Small Toys', brand: 'Generic', wholesalePrice: 38572, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 51430, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 }
+];
+
+const DEFAULT_SUPPLIERS = [
+  { id: 1, name: 'Challan Big Toys Wholesale (SL1-56,701)', phone: '+91 98123 45678', address: 'Wholesale Sports & Big Toys Market' },
+  { id: 2, name: 'Estimate Small Toys Wholesale (SLM-0)', phone: '+91 98234 56789', address: 'Small Toys Wholesalers Hub' }
+];
+
+// --- UTILITY FUNCTIONS ---
+function formatINR(amount) {
+  if (amount === null || amount === undefined || isNaN(amount)) return '₹0';
+  const num = Math.round(amount * 100) / 100;
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: num % 1 === 0 ? 0 : 2
+  }).format(num);
+}
+
+function calculatePricing({
+  wholesalePrice = 0,
+  additionalCost = 0,
+  pricingMethod = 'margin',
+  markupPercent = 25,
+  marginPercent = 25,
+  manualRetailPrice = 0,
+  roundingMethod = 'nearest5'
+}) {
+  const wholesale = Math.max(0, parseFloat(wholesalePrice) || 0);
+  const extraCost = Math.max(0, parseFloat(additionalCost) || 0);
+  const totalCost = wholesale + extraCost;
+
+  let calculatedPrice = totalCost;
+
+  if (pricingMethod === 'markup') {
+    const mk = parseFloat(markupPercent) || 0;
+    calculatedPrice = totalCost + (totalCost * mk / 100);
+  } else if (pricingMethod === 'margin') {
+    const mg = Math.min(99.9, Math.max(0, parseFloat(marginPercent) || 0));
+    calculatedPrice = mg >= 100 ? totalCost : totalCost / (1 - mg / 100);
+  } else if (pricingMethod === 'manual') {
+    calculatedPrice = Math.max(0, parseFloat(manualRetailPrice) || 0);
+  }
+
+  let suggestedRetailPrice = calculatedPrice;
+  if (roundingMethod === 'nearest5') {
+    suggestedRetailPrice = Math.round(calculatedPrice / 5) * 5;
+  } else if (roundingMethod === 'nearest10') {
+    suggestedRetailPrice = Math.round(calculatedPrice / 10) * 10;
+  } else if (roundingMethod === 'nearest50') {
+    suggestedRetailPrice = Math.round(calculatedPrice / 50) * 50;
+  } else if (roundingMethod === 'nearest100') {
+    suggestedRetailPrice = Math.round(calculatedPrice / 100) * 100;
+  } else if (roundingMethod === 'psychological') {
+    if (calculatedPrice > 0) {
+      suggestedRetailPrice = Math.max(1, (Math.ceil(calculatedPrice / 10) * 10) - 1);
+    }
+  } else {
+    suggestedRetailPrice = Math.round(calculatedPrice * 100) / 100;
+  }
+
+  const finalRetailPrice = pricingMethod === 'manual' 
+    ? Math.max(0, parseFloat(manualRetailPrice) || 0) 
+    : suggestedRetailPrice;
+
+  const profit = finalRetailPrice - totalCost;
+  const actualMarginPercent = finalRetailPrice > 0 ? (profit / finalRetailPrice) * 100 : 0;
+  const actualMarkupPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
+
+  return {
+    wholesale,
+    extraCost,
+    totalCost,
+    calculatedPrice: Math.round(calculatedPrice * 100) / 100,
+    suggestedRetailPrice,
+    finalRetailPrice,
+    profit: Math.round(profit * 100) / 100,
+    actualMarginPercent: Math.round(actualMarginPercent * 100) / 100,
+    actualMarkupPercent: Math.round(actualMarkupPercent * 100) / 100
+  };
+}
+
+// --- MAIN APPLICATION COMPONENT ---
+function App() {
+  const [appMode, setAppMode] = useState('price_checker'); // 'price_checker' | 'admin'
+  const [currentPage, setCurrentPage] = useState('price_checker');
+  const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [settings, setSettings] = useState(DEFAULT_APP_SETTINGS);
+  const [selectedCatalog, setSelectedCatalog] = useState('ALL');
+  const [loading, setLoading] = useState(true);
+
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [priceTagModalOpen, setPriceTagModalOpen] = useState(false);
+
+  const [editingProductId, setEditingProductId] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3200);
+  };
+
+  const seedAllRealCatalogs = async () => {
+    try {
+      await db.products.clear();
+      await db.suppliers.clear();
+
+      for (const supp of DEFAULT_SUPPLIERS) {
+        await db.suppliers.add(supp);
+      }
+
+      const now = new Date('2026-08-26').toISOString();
+      for (const prod of BIG_TOYS_PRODUCTS) {
+        await db.products.add({ ...prod, createdAt: now, updatedAt: now });
+      }
+      for (const prod of SMALL_TOYS_PRODUCTS) {
+        await db.products.add({ ...prod, createdAt: now, updatedAt: now });
+      }
+
+      await refreshData();
+      showToast('Loaded Big Toys (37 items) and Small Toys (131 items) catalogs!');
+    } catch (err) {
+      console.error('Error seeding catalogs:', err);
+      showToast('Failed to load catalogs', 'error');
+    }
+  };
+
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      let prodList = await db.products.toArray();
+      let suppList = await db.suppliers.toArray();
+
+      if (prodList.length < 150 || prodList.some(p => p.sku && p.sku.includes('-'))) {
+        await db.products.clear();
+        await db.suppliers.clear();
+        for (const supp of DEFAULT_SUPPLIERS) await db.suppliers.add(supp);
+        const now = new Date('2026-08-26').toISOString();
+        for (const prod of BIG_TOYS_PRODUCTS) await db.products.add({ ...prod, createdAt: now, updatedAt: now });
+        for (const prod of SMALL_TOYS_PRODUCTS) await db.products.add({ ...prod, createdAt: now, updatedAt: now });
+        prodList = await db.products.toArray();
+        suppList = await db.suppliers.toArray();
+      }
+
+      setProducts(prodList);
+      setSuppliers(suppList);
+    } catch (err) {
+      console.error('Failed to load database:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshData();
+  }, []);
+
+  const displayedProducts = useMemo(() => {
+    if (selectedCatalog === 'ALL') return products;
+    return products.filter(p => p.catalogTag === selectedCatalog);
+  }, [products, selectedCatalog]);
+
+  const handleStockAdjust = async (productId, delta) => {
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+    const newQty = Math.max(0, (prod.currentQuantity || 0) + delta);
+    await db.products.update(productId, { currentQuantity: newQty, updatedAt: new Date().toISOString() });
+    await refreshData();
+    showToast(`Stock updated for ${prod.name}: ${newQty} items remaining`);
+  };
+
+  const handleDeleteProduct = async (id) => {
+    const prod = products.find(p => p.id === id);
+    if (confirm(`Are you sure you want to delete "${prod?.name}"?`)) {
+      await db.products.delete(id);
+      await refreshData();
+      showToast(`Product "${prod?.name}" deleted`);
+      setDetailModalOpen(false);
+    }
+  };
+
+  const handleDuplicateProduct = async (prod) => {
+    const { id, ...rest } = prod;
+    const duplicated = {
+      ...rest,
+      name: `${prod.name} (Copy)`,
+      sku: `${prod.sku}-COPY`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await db.products.add(duplicated);
+    await refreshData();
+    showToast(`Duplicated as "${duplicated.name}"`);
+  };
+
+  const metrics = useMemo(() => {
+    const totalProducts = displayedProducts.length;
+    let totalStockItems = 0;
+    let totalWholesaleValue = 0;
+    let potentialRetailValue = 0;
+    let lowStockCount = 0;
+
+    displayedProducts.forEach(p => {
+      const qty = p.currentQuantity || 0;
+      const wholesale = p.wholesalePrice + (p.additionalCost || 0);
+      const retail = p.retailPrice || 0;
+
+      totalStockItems += qty;
+      totalWholesaleValue += (qty * wholesale);
+      potentialRetailValue += (qty * retail);
+
+      if (qty <= (p.minStockAlert || 1)) {
+        lowStockCount++;
+      }
+    });
+
+    const potentialProfit = potentialRetailValue - totalWholesaleValue;
+    const potentialProfitMargin = potentialRetailValue > 0 ? (potentialProfit / potentialRetailValue) * 100 : 0;
+
+    return {
+      totalProducts,
+      totalStockItems,
+      totalWholesaleValue,
+      potentialRetailValue,
+      potentialProfit,
+      potentialProfitMargin: Math.round(potentialProfitMargin * 10) / 10,
+      lowStockCount
+    };
+  }, [displayedProducts]);
+
+  return (
+    <div className="min-h-screen flex flex-col md:flex-row bg-slate-100/70 text-slate-900 font-sans antialiased selection:bg-emerald-600 selection:text-white">
+      
+      {/* HIGH-CONTRAST MODERN SIDEBAR */}
+      <aside className="w-full md:w-72 bg-white border-r-2 border-slate-200 flex flex-col shrink-0 no-print shadow-md">
+        <div className="p-6 border-b-2 border-slate-100 flex items-center gap-3.5 bg-gradient-to-r from-slate-900 to-slate-800 text-white">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/30">
+            🏆
+          </div>
+          <div>
+            <h1 className="font-extrabold text-base tracking-tight text-white leading-tight">
+              KARTAR SPORTS
+            </h1>
+            <p className="text-xs font-black text-emerald-400 uppercase tracking-wider">
+              &amp; Toys House
+            </p>
+          </div>
+        </div>
+
+        {/* MODE SWITCHER BANNER */}
+        <div className="p-3.5 bg-slate-50 border-b-2 border-slate-200">
+          <div className="text-[11px] font-black text-slate-500 uppercase tracking-wider mb-2 text-center">Active Mode</div>
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-200/70 rounded-2xl border">
+            <button 
+              onClick={() => { setAppMode('price_checker'); setCurrentPage('price_checker'); }}
+              className={`py-2 px-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
+                appMode === 'price_checker' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-700 hover:text-slate-950'
+              }`}
+            >
+              <span>🏷️ Price Checker</span>
+            </button>
+
+            <button 
+              onClick={() => { setAppMode('admin'); setCurrentPage('dashboard'); }}
+              className={`py-2 px-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
+                appMode === 'admin' ? 'bg-slate-950 text-white shadow-md' : 'text-slate-700 hover:text-slate-950'
+              }`}
+            >
+              <span>🛠️ Admin</span>
+            </button>
+          </div>
+        </div>
+
+        {/* NAVIGATION LINKS BASED ON MODE */}
+        <nav className="flex-1 p-3.5 space-y-1.5 overflow-y-auto">
+          {appMode === 'price_checker' ? (
+            <>
+              <div className="px-3 pt-2 pb-1 text-xs font-black text-slate-500 uppercase tracking-wider">Store Front Menu</div>
+              <NavItem icon="🏷️" label="Price Lookup" active={currentPage === 'price_checker'} onClick={() => setCurrentPage('price_checker')} />
+              <NavItem icon="🖨️" label="Print Price List" active={currentPage === 'print_list'} onClick={() => setCurrentPage('print_list')} />
+            </>
+          ) : (
+            <>
+              <div className="px-3 pt-2 pb-1 text-xs font-black text-slate-500 uppercase tracking-wider">Admin Navigation</div>
+              <NavItem icon="🏠" label="Dashboard" active={currentPage === 'dashboard'} onClick={() => setCurrentPage('dashboard')} />
+              <NavItem icon="📦" label="Products Catalog" badge={displayedProducts.length} active={currentPage === 'products'} onClick={() => setCurrentPage('products')} />
+              <NavItem icon="➕" label="Add New Product" active={currentPage === 'add_product'} onClick={() => { setEditingProductId(null); setCurrentPage('add_product'); }} />
+              <NavItem icon="💰" label="Bulk Price Calculator" active={currentPage === 'price_manager'} onClick={() => setCurrentPage('price_manager')} />
+              
+              <div className="px-3 pt-4 pb-1 text-xs font-black text-slate-500 uppercase tracking-wider">Reports &amp; Tools</div>
+              <NavItem icon="📊" label="Reports &amp; Export" active={currentPage === 'reports'} onClick={() => setCurrentPage('reports')} />
+              <NavItem icon="🏪" label="Suppliers Directory" active={currentPage === 'suppliers'} onClick={() => setCurrentPage('suppliers')} />
+              <NavItem icon="🖨️" label="Print Price List" active={currentPage === 'print_list'} onClick={() => setCurrentPage('print_list')} />
+              <NavItem icon="⚙️" label="Settings &amp; Backup" active={currentPage === 'settings'} onClick={() => setCurrentPage('settings')} />
+            </>
+          )}
+        </nav>
+
+        <div className="p-4 border-t-2 border-slate-100 bg-slate-50 text-center">
+          <p className="text-xs font-black text-slate-800">Kartar Sports &amp; Toys House</p>
+          <p className="text-[11px] font-bold text-slate-600 mt-0.5">
+            {appMode === 'price_checker' ? '🏷️ Counter Price Checker' : '🛠️ Full Admin Manager'}
+          </p>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 overflow-y-auto p-5 md:p-8">
+        
+        {toast && (
+          <div className={`fixed top-6 right-6 z-50 px-5 py-4 rounded-2xl shadow-2xl font-black text-sm border-2 flex items-center gap-3 transition-all animate-bounce ${
+            toast.type === 'error' ? 'bg-rose-100 text-rose-900 border-rose-300' : 'bg-emerald-600 text-white border-emerald-500'
+          }`}>
+            <span className="text-lg">{toast.type === 'error' ? '⚠️' : '✅'}</span>
+            <span>{toast.message}</span>
+          </div>
+        )}
+
+        {/* PRICE CHECKER PAGE (RETAIL ONLY MODE) */}
+        {currentPage === 'price_checker' && (
+          <PriceCheckerPage 
+            products={products}
+            selectedCatalog={selectedCatalog}
+            setSelectedCatalog={setSelectedCatalog}
+            setSelectedProduct={setSelectedProduct}
+            setPriceTagModalOpen={setPriceTagModalOpen}
+            setAppMode={setAppMode}
+          />
+        )}
+
+        {currentPage === 'dashboard' && appMode === 'admin' && (
+          <DashboardPage 
+            metrics={metrics} 
+            products={displayedProducts} 
+            selectedCatalog={selectedCatalog}
+            setSelectedCatalog={setSelectedCatalog}
+            setCurrentPage={setCurrentPage} 
+            setEditingProductId={setEditingProductId}
+            setSelectedProduct={setSelectedProduct}
+            setDetailModalOpen={setDetailModalOpen}
+            seedAllRealCatalogs={seedAllRealCatalogs}
+            handleStockAdjust={handleStockAdjust}
+          />
+        )}
+
+        {currentPage === 'products' && appMode === 'admin' && (
+          <ProductsPage 
+            products={displayedProducts} 
+            suppliers={suppliers}
+            selectedCatalog={selectedCatalog}
+            setSelectedCatalog={setSelectedCatalog}
+            setCurrentPage={setCurrentPage}
+            setEditingProductId={setEditingProductId}
+            setSelectedProduct={setSelectedProduct}
+            setDetailModalOpen={setDetailModalOpen}
+            setPriceTagModalOpen={setPriceTagModalOpen}
+            handleStockAdjust={handleStockAdjust}
+            handleDeleteProduct={handleDeleteProduct}
+            handleDuplicateProduct={handleDuplicateProduct}
+          />
+        )}
+
+        {(currentPage === 'add_product' || currentPage === 'edit_product') && appMode === 'admin' && (
+          <AddEditProductPage 
+            editingProductId={editingProductId}
+            products={products}
+            suppliers={suppliers}
+            settings={settings}
+            refreshData={refreshData}
+            setCurrentPage={setCurrentPage}
+            showToast={showToast}
+          />
+        )}
+
+        {currentPage === 'price_manager' && appMode === 'admin' && (
+          <PriceManagerPage 
+            products={displayedProducts} 
+            suppliers={suppliers} 
+            refreshData={refreshData} 
+            showToast={showToast} 
+          />
+        )}
+
+        {currentPage === 'suppliers' && appMode === 'admin' && (
+          <SuppliersPage 
+            suppliers={suppliers} 
+            products={products} 
+            refreshData={refreshData} 
+            showToast={showToast} 
+          />
+        )}
+
+        {currentPage === 'reports' && appMode === 'admin' && (
+          <ReportsPage 
+            products={displayedProducts} 
+            metrics={metrics} 
+            settings={settings}
+          />
+        )}
+
+        {currentPage === 'print_list' && (
+          <PrintPriceListPage 
+            products={displayedProducts} 
+            settings={settings} 
+            selectedCatalog={selectedCatalog}
+          />
+        )}
+
+        {currentPage === 'settings' && appMode === 'admin' && (
+          <SettingsPage 
+            settings={settings} 
+            db={db} 
+            refreshData={refreshData} 
+            showToast={showToast} 
+            seedAllRealCatalogs={seedAllRealCatalogs}
+          />
+        )}
+
+      </main>
+
+      {/* MODALS */}
+      {detailModalOpen && selectedProduct && appMode === 'admin' && (
+        <ProductDetailModal 
+          product={selectedProduct}
+          supplier={suppliers.find(s => s.id === selectedProduct.supplierId)}
+          onClose={() => setDetailModalOpen(false)}
+          onEdit={() => { setDetailModalOpen(false); setEditingProductId(selectedProduct.id); setCurrentPage('edit_product'); }}
+          onDuplicate={() => { handleDuplicateProduct(selectedProduct); setDetailModalOpen(false); }}
+          onDelete={() => handleDeleteProduct(selectedProduct.id)}
+          onPrintTag={() => { setDetailModalOpen(false); setPriceTagModalOpen(true); }}
+        />
+      )}
+
+      {priceTagModalOpen && selectedProduct && (
+        <Modal title="Printable Retail Price Tag" onClose={() => setPriceTagModalOpen(false)}>
+          <div className="space-y-5">
+            <div id="printable-area" className="p-8 bg-white text-slate-950 rounded-3xl border-4 border-dashed border-slate-300 max-w-sm mx-auto text-center space-y-3 font-sans shadow-2xl">
+              <p className="text-xs font-black tracking-widest text-emerald-700 uppercase">{settings.shopName || 'KARTAR SPORTS AND TOYS HOUSE'}</p>
+              <h3 className="font-extrabold text-2xl leading-tight text-slate-950">{selectedProduct.name}</h3>
+              <p className="text-sm font-extrabold text-slate-700 bg-slate-100 inline-block px-3 py-1 rounded-full">{selectedProduct.catalogTag} • {selectedProduct.category}</p>
+              
+              <div className="py-4 my-3 border-y-4 border-slate-950 bg-emerald-50 rounded-2xl">
+                <p className="text-xs uppercase tracking-wider font-black text-slate-700">Retail Selling Price (MRP)</p>
+                <p className="text-4xl font-black text-slate-950 mt-1">{formatINR(selectedProduct.retailPrice)}</p>
+              </div>
+
+              <div className="flex justify-between items-center text-xs font-mono font-bold text-slate-800 bg-slate-50 p-2.5 rounded-xl border">
+                <span>SKU: {selectedProduct.sku}</span>
+                <span>S.N. #{selectedProduct.itemNo}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end no-print pt-2">
+              <button onClick={() => window.print()} className="py-3 px-6 bg-emerald-600 text-white font-extrabold rounded-2xl text-xs shadow-lg flex items-center gap-2">🖨️ Print Tag</button>
+              <button onClick={() => setPriceTagModalOpen(false)} className="py-3 px-5 bg-slate-200 text-slate-900 font-extrabold rounded-2xl text-xs border border-slate-300">Close</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+    </div>
+  );
+}
+
+function NavItem({ icon, label, badge, active, onClick }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-full py-3 px-4 rounded-2xl font-extrabold text-xs md:text-sm flex items-center justify-between transition-all ${
+        active 
+          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30' 
+          : 'text-slate-800 hover:bg-slate-100 hover:text-slate-950'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <span className="text-lg">{icon}</span>
+        <span>{label}</span>
+      </div>
+      {badge !== undefined && (
+        <span className={`px-2.5 py-1 rounded-full text-xs font-black ${active ? 'bg-emerald-800 text-white' : 'bg-slate-200 text-slate-900 border'}`}>
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
+// --- RETAIL PRICE CHECKER PAGE (STORE FRONT COUNTER MODE) ---
+function PriceCheckerPage({ products, selectedCatalog, setSelectedCatalog, setSelectedProduct, setPriceTagModalOpen, setAppMode }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'grid'
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, []);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchCatalog = selectedCatalog === 'ALL' || p.catalogTag === selectedCatalog;
+      const matchSearch = searchTerm === '' || 
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(p.itemNo) === searchTerm.trim();
+      return matchCatalog && matchSearch;
+    }).sort((a, b) => (a.itemNo || 0) - (b.itemNo || 0));
+  }, [products, selectedCatalog, searchTerm]);
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      
+      {/* HEADER BANNER */}
+      <div className="bg-gradient-to-r from-emerald-600 to-emerald-800 text-white rounded-3xl p-6 md:p-8 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="px-3 py-1 bg-white/20 text-white rounded-full text-xs font-black uppercase tracking-wider">
+              🏷️ Retail Counter Mode
+            </span>
+            <span className="text-xs text-emerald-200 font-bold">• Kartar Sports &amp; Toys</span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-black tracking-tight">Product Retail Price Checker</h2>
+          <p className="text-sm font-extrabold text-emerald-100 mt-1">Search by Product S.N. (#1, #127), SKU (BIG1, SML127), or Name</p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setSearchTerm('')}
+            className="py-3 px-5 bg-white/20 hover:bg-white/30 text-white font-extrabold rounded-2xl text-xs md:text-sm transition-all"
+          >
+            🧹 Clear Search
+          </button>
+          <button 
+            onClick={() => setAppMode('admin')}
+            className="py-3 px-5 bg-slate-950 hover:bg-slate-900 text-white font-extrabold rounded-2xl text-xs md:text-sm border-2 border-emerald-400/30 transition-all shadow-md"
+          >
+            🛠️ Admin Mode
+          </button>
+        </div>
+      </div>
+
+      {/* GIANT SEARCH BAR */}
+      <div className="relative shadow-xl rounded-3xl">
+        <span className="absolute inset-y-0 left-5 flex items-center text-emerald-600 text-2xl pointer-events-none">🔍</span>
+        <input 
+          ref={searchInputRef}
+          type="text" 
+          placeholder="Type Product S.N. (#1, #20, #127), SKU (BIG1, SML127), or Item Name..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-14 pr-6 py-5 bg-white border-4 border-emerald-500 rounded-3xl text-lg md:text-xl font-black text-slate-950 shadow-inner focus:outline-none focus:ring-4 focus:ring-emerald-200 transition-all"
+        />
+        {searchTerm && (
+          <button 
+            onClick={() => setSearchTerm('')}
+            className="absolute inset-y-0 right-5 flex items-center text-slate-400 hover:text-slate-800 text-2xl font-black"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* CATALOG FILTER TABS & VIEW TOGGLE SWITCHER */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-3xl border-2 border-slate-200 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-black text-slate-500 uppercase tracking-wider px-2">Catalog:</span>
+          
+          <button 
+            onClick={() => setSelectedCatalog('ALL')} 
+            className={`py-3 px-5 rounded-2xl font-extrabold text-sm border-2 transition-all flex items-center gap-2.5 ${
+              selectedCatalog === 'ALL' 
+                ? 'bg-slate-950 text-white border-slate-950 shadow-md ring-2 ring-slate-950/30' 
+                : 'bg-slate-50 text-slate-800 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            <span>📦 All Catalogs</span>
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${selectedCatalog === 'ALL' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900'}`}>168</span>
+          </button>
+
+          <button 
+            onClick={() => setSelectedCatalog('Big Toys')} 
+            className={`py-3 px-5 rounded-2xl font-extrabold text-sm border-2 transition-all flex items-center gap-2.5 ${
+              selectedCatalog === 'Big Toys' 
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-600/30' 
+                : 'bg-slate-50 text-slate-800 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            <span>🧸 Big Toys Catalog</span>
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${selectedCatalog === 'Big Toys' ? 'bg-emerald-800 text-white' : 'bg-slate-200 text-slate-900'}`}>37</span>
+          </button>
+
+          <button 
+            onClick={() => setSelectedCatalog('Small Toys')} 
+            className={`py-3 px-5 rounded-2xl font-extrabold text-sm border-2 transition-all flex items-center gap-2.5 ${
+              selectedCatalog === 'Small Toys' 
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-600/30' 
+                : 'bg-slate-50 text-slate-800 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            <span>🪀 Small Toys Catalog</span>
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${selectedCatalog === 'Small Toys' ? 'bg-emerald-800 text-white' : 'bg-slate-200 text-slate-900'}`}>131</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* VIEW MODE TOGGLE SWITCHER */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-2xl border-2 border-slate-300">
+            <button 
+              onClick={() => setViewMode('list')}
+              className={`py-2 px-3.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all ${
+                viewMode === 'list' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-700 hover:text-slate-950'
+              }`}
+            >
+              <span>📋 List View</span>
+            </button>
+
+            <button 
+              onClick={() => setViewMode('grid')}
+              className={`py-2 px-3.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all ${
+                viewMode === 'grid' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-700 hover:text-slate-950'
+              }`}
+            >
+              <span>📱 Grid View</span>
+            </button>
+          </div>
+
+          <div className="text-sm font-black text-slate-700 px-2 font-mono hidden md:block">
+            Found {filteredProducts.length} Items
+          </div>
+        </div>
+      </div>
+
+      {/* RETAIL PRODUCTS DISPLAY: LIST VIEW OR GRID VIEW */}
+      {viewMode === 'list' ? (
+        <div className="bg-white border-2 border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-900 border-b-2 border-slate-950 text-xs font-black uppercase text-slate-100 tracking-wider">
+                  <th className="py-4 px-5 w-20 text-center">S.N.</th>
+                  <th className="py-4 px-4">Catalog</th>
+                  <th className="py-4 px-5">Item Name &amp; Description</th>
+                  <th className="py-4 px-4">SKU Code</th>
+                  <th className="py-4 px-6 text-right">Retail MRP Price</th>
+                  <th className="py-4 px-5 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y-2 divide-slate-100 text-sm font-sans">
+                {filteredProducts.map(p => (
+                  <tr 
+                    key={p.id} 
+                    className="hover:bg-emerald-50/60 transition-all cursor-pointer"
+                    onClick={() => { setSelectedProduct(p); setPriceTagModalOpen(true); }}
+                  >
+                    <td className="py-4 px-5 text-center font-mono font-black text-slate-950 bg-slate-50 text-base">
+                      #{p.itemNo}
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-extrabold border ${
+                        p.catalogTag === 'Big Toys' ? 'bg-amber-100 text-amber-950 border-amber-300' : 'bg-sky-100 text-sky-950 border-sky-300'
+                      }`}>
+                        {p.catalogTag}
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 font-black text-slate-950 text-base md:text-lg">
+                      {p.name}
+                    </td>
+                    <td className="py-4 px-4 font-mono font-extrabold text-slate-700 text-base">{p.sku}</td>
+                    <td className="py-4 px-6 text-right font-mono font-black text-emerald-700 text-xl bg-emerald-50/40">
+                      {formatINR(p.retailPrice)}
+                    </td>
+                    <td className="py-4 px-5 text-center">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setSelectedProduct(p); setPriceTagModalOpen(true); }}
+                        className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold shadow-md transition"
+                      >
+                        🏷️ Price Tag
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        /* RETAIL PRODUCTS GRID LOOKUP */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredProducts.map(p => (
+            <div 
+              key={p.id} 
+              onClick={() => { setSelectedProduct(p); setPriceTagModalOpen(true); }}
+              className="bg-white border-2 border-slate-200 hover:border-emerald-500 rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between group"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="px-3 py-1 bg-slate-900 text-white rounded-xl text-xs font-mono font-black shadow-xs">
+                    S.N. #{p.itemNo}
+                  </span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-black border ${
+                    p.catalogTag === 'Big Toys' ? 'bg-amber-100 text-amber-950 border-amber-300' : 'bg-sky-100 text-sky-950 border-sky-300'
+                  }`}>
+                    {p.catalogTag}
+                  </span>
+                </div>
+
+                <h3 className="font-extrabold text-lg md:text-xl text-slate-950 group-hover:text-emerald-700 transition leading-snug">
+                  {p.name}
+                </h3>
+                
+                <div className="mt-2 text-xs font-mono font-bold text-slate-500">
+                  SKU: <span className="text-slate-800 font-extrabold">{p.sku}</span>
+                </div>
+              </div>
+
+              <div className="mt-5 pt-4 border-t-2 border-slate-100 flex items-center justify-between bg-emerald-50/50 -mx-6 -mb-6 p-6 rounded-b-3xl">
+                <div>
+                  <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 block">Retail Selling Price</span>
+                  <span className="text-2xl md:text-3xl font-black text-emerald-700 font-mono">{formatINR(p.retailPrice)}</span>
+                </div>
+                <button className="py-2.5 px-4 bg-emerald-600 group-hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-md flex items-center gap-1.5 transition">
+                  🏷️ Price Tag
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// --- DASHBOARD PAGE WITH HIGH-CONTRAST METRICS ---
+function DashboardPage({ metrics, products, selectedCatalog, setSelectedCatalog, setCurrentPage, setEditingProductId, setSelectedProduct, setDetailModalOpen, seedAllRealCatalogs, handleStockAdjust }) {
+  return (
+    <div className="space-y-6">
+      
+      {/* HEADER BANNER */}
+      <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="px-3 py-1 bg-emerald-100 text-emerald-900 rounded-full text-xs font-black border border-emerald-300 uppercase tracking-wide">
+              Active View: {selectedCatalog} Catalog
+            </span>
+            <span className="text-xs text-slate-600 font-bold">• Kartar Sports &amp; Toys</span>
+          </div>
+          <h2 className="text-2xl md:text-3xl font-black text-slate-950 tracking-tight">Retail Pricing Portal (Admin Mode)</h2>
+          <p className="text-sm font-semibold text-slate-600 mt-1">Real Wholesale Data: Big Toys (37 items) &amp; Small Toys (131 items)</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button 
+            onClick={() => { setEditingProductId(null); setCurrentPage('add_product'); }}
+            className="py-3.5 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs md:text-sm flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all"
+          >
+            ➕ Add New Product
+          </button>
+          <button 
+            onClick={seedAllRealCatalogs}
+            className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-900 font-extrabold rounded-2xl text-xs md:text-sm border-2 border-slate-300 transition-all"
+          >
+            🔄 Reset Data
+          </button>
+        </div>
+      </div>
+
+      {/* METRIC CARDS WITH LARGE NUMBERS & CRISP CONTRAST */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <StatCard title="Catalog Products" value={metrics.totalProducts} icon="📦" subtitle="Available Items" />
+        <StatCard title="Total Stock Units" value={metrics.totalStockItems} icon="📊" subtitle="In Store" />
+        <StatCard title="Wholesale Cost" value={formatINR(metrics.totalWholesaleValue)} icon="🏷️" subtitle="Purchase Value" />
+        <StatCard title="Retail Selling Value" value={formatINR(metrics.potentialRetailValue)} icon="🛍️" subtitle="Calculated MRP" />
+        <StatCard title="Expected Profit" value={formatINR(metrics.potentialProfit)} icon="📈" highlight subtitle={`Margin ${metrics.potentialProfitMargin}%`} />
+        <StatCard title="Low Stock Alerts" value={metrics.lowStockCount} icon="⚠️" subtitle="Reorder Needed" />
+      </div>
+
+      {/* FINANCIAL SUMMARY TABLE */}
+      <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 space-y-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-slate-100 pb-4 gap-2">
+          <div>
+            <h3 className="font-extrabold text-lg text-slate-950 flex items-center gap-2">
+              <span>📊</span>
+              <span>{selectedCatalog} Catalog Financial Breakdown</span>
+            </h3>
+            <p className="text-xs text-slate-600 font-bold mt-0.5">Calculated based on 25.0% target margin rounded to nearest ₹5</p>
+          </div>
+          <span className="text-xs font-mono font-black px-4 py-2 bg-emerald-50 text-emerald-900 border-2 border-emerald-300 rounded-2xl">
+            Profit Margin: 25.0%
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+          <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
+            <p className="text-xs font-extrabold text-slate-600 uppercase tracking-wider">Total Wholesale Investment</p>
+            <p className="text-2xl font-black text-slate-950 mt-2 font-mono">{formatINR(metrics.totalWholesaleValue)}</p>
+          </div>
+          <div className="p-5 bg-emerald-50/70 rounded-2xl border-2 border-emerald-200">
+            <p className="text-xs font-extrabold text-emerald-800 uppercase tracking-wider">Total Retail MRP Value</p>
+            <p className="text-2xl font-black text-emerald-700 mt-2 font-mono">{formatINR(metrics.potentialRetailValue)}</p>
+          </div>
+          <div className="p-5 bg-amber-50/70 rounded-2xl border-2 border-amber-200">
+            <p className="text-xs font-extrabold text-amber-800 uppercase tracking-wider">Estimated Total Profit</p>
+            <p className="text-2xl font-black text-amber-700 mt-2 font-mono">{formatINR(metrics.potentialProfit)}</p>
+          </div>
+          <div className="p-5 bg-sky-50/70 rounded-2xl border-2 border-sky-200">
+            <p className="text-xs font-extrabold text-sky-800 uppercase tracking-wider">Effective Markup %</p>
+            <p className="text-2xl font-black text-sky-700 mt-2 font-mono">
+              {metrics.totalWholesaleValue > 0 ? Math.round((metrics.potentialProfit / metrics.totalWholesaleValue) * 100 * 10) / 10 : 0}%
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+function StatCard({ title, value, icon, highlight, subtitle }) {
+  return (
+    <div className={`p-5 rounded-3xl border-2 transition-all shadow-sm ${
+      highlight ? 'bg-gradient-to-br from-emerald-600 to-emerald-800 text-white border-emerald-500' : 'bg-white border-slate-200'
+    }`}>
+      <div className="flex items-center justify-between text-xs font-extrabold">
+        <span className={highlight ? 'text-emerald-100' : 'text-slate-600'}>{title}</span>
+        <span className="text-2xl p-2 bg-white/20 rounded-2xl">{icon}</span>
+      </div>
+      <p className={`text-2xl font-black mt-3 tracking-tight font-mono ${highlight ? 'text-white' : 'text-slate-950'}`}>{value}</p>
+      {subtitle && (
+        <p className={`text-[11px] font-extrabold mt-1 ${highlight ? 'text-emerald-200' : 'text-slate-500'}`}>{subtitle}</p>
+      )}
+    </div>
+  );
+}
+
+// --- HIGH-READABILITY PRODUCTS PAGE ---
+function ProductsPage({ 
+  products, suppliers, selectedCatalog, setSelectedCatalog, setCurrentPage, 
+  setEditingProductId, setSelectedProduct, setDetailModalOpen, setStockModalOpen, 
+  setPriceTagModalOpen, handleStockAdjust, handleDeleteProduct, handleDuplicateProduct 
+}) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('itemNo');
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchCatalog = selectedCatalog === 'ALL' || p.catalogTag === selectedCatalog;
+      const matchSearch = searchTerm === '' || 
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(p.itemNo) === searchTerm.trim() ||
+        p.category.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchCatalog && matchSearch;
+    }).sort((a, b) => {
+      if (sortBy === 'itemNo') return (a.itemNo || 0) - (b.itemNo || 0);
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'price_high') return b.retailPrice - a.retailPrice;
+      return 0;
+    });
+  }, [products, selectedCatalog, searchTerm, sortBy]);
+
+  return (
+    <div className="space-y-6">
+      
+      <div>
+        <h2 className="text-2xl md:text-3xl font-black text-slate-950 tracking-tight">Products Catalog (Admin Mode)</h2>
+        <p className="text-xs md:text-sm font-bold text-slate-600">Managing real wholesale items with calculated retail MRPs</p>
+      </div>
+
+      {/* SEARCH BAR */}
+      <div className="relative">
+        <span className="absolute inset-y-0 left-4 flex items-center text-slate-500 text-xl pointer-events-none">🔍</span>
+        <input 
+          type="text" 
+          placeholder="Search by S.N. (#1, #127), Product Name, SKU Code (BIG1, SML127), Category..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-300 rounded-2xl text-sm font-extrabold text-slate-950 shadow-sm focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100 transition-all"
+        />
+      </div>
+
+      {/* CATALOG FILTER TABS DIRECTLY ABOVE PRODUCT TABLE */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 md:p-4 rounded-3xl border-2 border-slate-200 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-black text-slate-500 uppercase tracking-wider px-2">Catalog:</span>
+          
+          <button 
+            onClick={() => setSelectedCatalog('ALL')} 
+            className={`py-2.5 px-4 rounded-2xl font-extrabold text-xs md:text-sm border-2 transition-all flex items-center gap-2 ${
+              selectedCatalog === 'ALL' 
+                ? 'bg-slate-950 text-white border-slate-950 shadow-md ring-2 ring-slate-950/30' 
+                : 'bg-slate-50 text-slate-800 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            <span>📦 All Catalogs</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-black ${selectedCatalog === 'ALL' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900'}`}>168</span>
+          </button>
+
+          <button 
+            onClick={() => setSelectedCatalog('Big Toys')} 
+            className={`py-2.5 px-4 rounded-2xl font-extrabold text-xs md:text-sm border-2 transition-all flex items-center gap-2 ${
+              selectedCatalog === 'Big Toys' 
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-600/30' 
+                : 'bg-slate-50 text-slate-800 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            <span>🧸 Big Toys Catalog</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-black ${selectedCatalog === 'Big Toys' ? 'bg-emerald-800 text-white' : 'bg-slate-200 text-slate-900'}`}>37</span>
+          </button>
+
+          <button 
+            onClick={() => setSelectedCatalog('Small Toys')} 
+            className={`py-2.5 px-4 rounded-2xl font-extrabold text-xs md:text-sm border-2 transition-all flex items-center gap-2 ${
+              selectedCatalog === 'Small Toys' 
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-600/30' 
+                : 'bg-slate-50 text-slate-800 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            <span>🪀 Small Toys Catalog</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-black ${selectedCatalog === 'Small Toys' ? 'bg-emerald-800 text-white' : 'bg-slate-200 text-slate-900'}`}>131</span>
+          </button>
+        </div>
+
+        <div className="text-xs font-black text-slate-600 px-2 font-mono">
+          Showing {filteredProducts.length} Items
+        </div>
+      </div>
+
+      {/* HIGH-READABILITY TABLE */}
+      <div className="bg-white border-2 border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-900 border-b-2 border-slate-950 text-xs font-black uppercase text-slate-100 tracking-wider">
+                <th className="py-4 px-4 w-16 text-center">S.N.</th>
+                <th className="py-4 px-4">Catalog</th>
+                <th className="py-4 px-5">Item Description</th>
+                <th className="py-4 px-4">SKU Code</th>
+                <th className="py-4 px-4">Wholesale Rate</th>
+                <th className="py-4 px-4">Retail MRP (25%)</th>
+                <th className="py-4 px-4">Expected Profit</th>
+                <th className="py-4 px-4 text-center">In Stock</th>
+                <th className="py-4 px-5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y-2 divide-slate-100 text-sm font-sans">
+              {filteredProducts.map(p => {
+                const totalCost = p.wholesalePrice + (p.additionalCost || 0);
+                const profit = p.retailPrice - totalCost;
+
+                return (
+                  <tr key={p.id} className="hover:bg-emerald-50/60 transition-all">
+                    <td className="py-4 px-4 text-center font-mono font-black text-slate-900 bg-slate-50/80">
+                      #{p.itemNo}
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-extrabold border ${
+                        p.catalogTag === 'Big Toys' ? 'bg-amber-100 text-amber-950 border-amber-300' : 'bg-sky-100 text-sky-950 border-sky-300'
+                      }`}>
+                        {p.catalogTag}
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 font-extrabold text-slate-950 text-base cursor-pointer hover:text-emerald-700 transition" onClick={() => { setSelectedProduct(p); setDetailModalOpen(true); }}>
+                      {p.name}
+                    </td>
+                    <td className="py-4 px-4 font-mono font-bold text-slate-800">{p.sku}</td>
+                    <td className="py-4 px-4 font-mono font-bold text-slate-800 text-base">{formatINR(totalCost)}</td>
+                    <td className="py-4 px-4 font-mono font-black text-emerald-700 text-lg bg-emerald-50/30">{formatINR(p.retailPrice)}</td>
+                    <td className="py-4 px-4 font-mono font-extrabold text-amber-700 text-base">{formatINR(profit)}</td>
+                    <td className="py-4 px-4 text-center font-black text-slate-900">{p.currentQuantity} pcs</td>
+                    <td className="py-4 px-5 text-right space-x-2">
+                      <button onClick={() => { setEditingProductId(p.id); setCurrentPage('edit_product'); }} className="px-3.5 py-2 bg-slate-950 text-white font-extrabold rounded-xl text-xs hover:bg-slate-800 transition">✏️ Edit</button>
+                      <button onClick={() => { setSelectedProduct(p); setPriceTagModalOpen(true); }} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-900 font-extrabold rounded-xl text-xs border-2 border-slate-300 transition">🏷️ Tag</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+// --- ADD / EDIT PRODUCT PAGE ---
+function AddEditProductPage({ editingProductId, products, suppliers, settings, refreshData, setCurrentPage, showToast }) {
+  const isEditing = Boolean(editingProductId);
+  const existingProduct = isEditing ? products.find(p => p.id === editingProductId) : null;
+
+  const [catalogTag, setCatalogTag] = useState(existingProduct?.catalogTag || 'Big Toys');
+  const [itemNo, setItemNo] = useState(existingProduct?.itemNo || products.length + 1);
+  const [name, setName] = useState(existingProduct?.name || '');
+  const [sku, setSku] = useState(existingProduct?.sku || `PROD-${String(products.length + 1).padStart(3, '0')}`);
+  const [category, setCategory] = useState(existingProduct?.category || 'Big Toys');
+  const [wholesalePrice, setWholesalePrice] = useState(existingProduct?.wholesalePrice ?? 500);
+  const [additionalCost, setAdditionalCost] = useState(existingProduct?.additionalCost ?? 0);
+  const [marginPercent, setMarginPercent] = useState(existingProduct?.marginPercent ?? 25);
+  const [quantityPurchased, setQuantityPurchased] = useState(existingProduct?.quantityPurchased ?? 1);
+
+  const calc = useMemo(() => calculatePricing({ wholesalePrice, additionalCost, marginPercent }), [wholesalePrice, additionalCost, marginPercent]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const now = new Date().toISOString();
+    const payload = {
+      catalogTag,
+      itemNo: Number(itemNo),
+      name: name.trim(),
+      sku: sku.trim(),
+      category,
+      brand: 'Generic',
+      wholesalePrice: parseFloat(wholesalePrice) || 0,
+      additionalCost: parseFloat(additionalCost) || 0,
+      pricingMethod: 'margin',
+      marginPercent: parseFloat(marginPercent) || 25,
+      retailPrice: calc.suggestedRetailPrice,
+      roundingMethod: 'nearest5',
+      quantityPurchased: parseInt(quantityPurchased) || 1,
+      currentQuantity: parseInt(quantityPurchased) || 1,
+      minStockAlert: 1,
+      updatedAt: now
+    };
+
+    if (isEditing) {
+      await db.products.update(editingProductId, payload);
+      showToast(`Updated "${name}"`);
+    } else {
+      payload.createdAt = now;
+      await db.products.add(payload);
+      showToast(`Added product "${name}"`);
+    }
+
+    await refreshData();
+    setCurrentPage('products');
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <h2 className="text-2xl md:text-3xl font-black text-slate-950">{isEditing ? 'Edit Product' : 'Add New Product'}</h2>
+      <form onSubmit={handleSubmit} className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 space-y-5 shadow-sm">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5">Catalog Category</label>
+            <select value={catalogTag} onChange={(e) => setCatalogTag(e.target.value)} className="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-sm font-extrabold text-slate-950">
+              <option value="Big Toys">🧸 Big Toys Catalog</option>
+              <option value="Small Toys">🪀 Small Toys Catalog</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5">Product S.N. (# Number)</label>
+            <input type="number" required value={itemNo} onChange={(e) => setItemNo(e.target.value)} className="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-sm font-extrabold text-slate-950 font-mono" />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5">Item Description / Name</label>
+          <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-sm font-extrabold text-slate-950" />
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5">Wholesale Rate (₹)</label>
+            <input type="number" required value={wholesalePrice} onChange={(e) => setWholesalePrice(e.target.value)} className="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-base font-black text-slate-950 font-mono" />
+          </div>
+          <div>
+            <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5">Margin (%)</label>
+            <input type="number" value={marginPercent} onChange={(e) => setMarginPercent(e.target.value)} className="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-base font-black text-slate-950 font-mono" />
+          </div>
+          <div>
+            <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5">Calculated MRP (₹)</label>
+            <div className="p-3.5 bg-emerald-600 text-white rounded-2xl text-base font-black font-mono text-center shadow-sm">{formatINR(calc.finalRetailPrice)}</div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-4 border-t">
+          <button type="button" onClick={() => setCurrentPage('products')} className="py-3 px-5 bg-slate-100 text-slate-800 font-extrabold rounded-2xl text-xs md:text-sm border">Cancel</button>
+          <button type="submit" className="py-3 px-7 bg-emerald-600 text-white font-black rounded-2xl text-xs md:text-sm shadow-md">Save Product</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// --- REPORTS & EXPORT PAGE ---
+function ReportsPage({ products, metrics, settings }) {
+  const exportExcel = () => {
+    if (!window.XLSX) return;
+    const data = products.map(p => ({
+      'Catalog': p.catalogTag,
+      'S.N.': p.itemNo,
+      'Product Name': p.name,
+      'SKU': p.sku,
+      'Wholesale Rate (₹)': p.wholesalePrice,
+      'Retail Price (₹)': p.retailPrice,
+      'Profit (₹)': p.retailPrice - p.wholesalePrice,
+      'Qty': p.currentQuantity || 0
+    }));
+
+    const worksheet = window.XLSX.utils.json_to_sheet(data);
+    const workbook = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(workbook, worksheet, 'Wholesale Report');
+    window.XLSX.writeFile(workbook, `Kartar_Sports_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-black text-slate-950">📊 Catalog Inventory Reports</h2>
+          <p className="text-xs md:text-sm font-bold text-slate-600">{products.length} products listed</p>
+        </div>
+        <button onClick={exportExcel} className="py-3 px-5 bg-emerald-600 text-white font-black rounded-2xl text-xs md:text-sm shadow-md flex items-center gap-2">
+          📊 Export Excel (.xlsx)
+        </button>
+      </div>
+
+      <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm overflow-x-auto">
+        <table className="w-full text-left text-sm font-sans">
+          <thead>
+            <tr className="border-b-2 border-slate-900 bg-slate-900 text-white text-xs font-black uppercase">
+              <th className="py-3.5 px-4">Catalog</th>
+              <th className="py-3.5 px-4">S.N.</th>
+              <th className="py-3.5 px-4">Item Name</th>
+              <th className="py-3.5 px-4">Wholesale Rate</th>
+              <th className="py-3.5 px-4">Retail Price</th>
+              <th className="py-3.5 px-4">Profit</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y font-mono">
+            {products.map(p => (
+              <tr key={p.id} className="hover:bg-slate-50">
+                <td className="py-3 px-4 font-sans font-bold text-slate-700">{p.catalogTag}</td>
+                <td className="py-3 px-4 font-black text-slate-900">#{p.itemNo}</td>
+                <td className="py-3 px-4 font-sans font-extrabold text-slate-950">{p.name}</td>
+                <td className="py-3 px-4 font-bold text-slate-800">{formatINR(p.wholesalePrice)}</td>
+                <td className="py-3 px-4 font-black text-emerald-700">{formatINR(p.retailPrice)}</td>
+                <td className="py-3 px-4 font-bold text-amber-700">{formatINR(p.retailPrice - p.wholesalePrice)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// --- PRINT PRICE LIST PAGE ---
+function PrintPriceListPage({ products, settings, selectedCatalog }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center no-print">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-black text-slate-950">🖨️ Printable Retail Price List</h2>
+          <p className="text-xs md:text-sm font-bold text-slate-600">Selected Catalog: {selectedCatalog}</p>
+        </div>
+        <button onClick={() => window.print()} className="py-3 px-6 bg-emerald-600 text-white font-black rounded-2xl text-xs md:text-sm shadow-md">
+          🖨️ Print Price List
+        </button>
+      </div>
+
+      <div id="printable-area" className="bg-white text-slate-950 rounded-3xl p-8 max-w-4xl mx-auto space-y-6 shadow-xl font-sans border-2 border-slate-300">
+        <div className="border-b-4 border-slate-950 pb-4 text-center space-y-1">
+          <h1 className="text-3xl font-black uppercase text-slate-950 tracking-tight">{settings.shopName}</h1>
+          <p className="text-sm font-extrabold text-emerald-700 uppercase tracking-widest">{selectedCatalog} Catalog Retail Price List</p>
+        </div>
+
+        <table className="w-full text-left text-sm border-collapse">
+          <thead>
+            <tr className="border-b-4 border-slate-950 text-xs font-black uppercase bg-slate-100">
+              <th className="py-3 px-3 w-16 text-center">S.N.</th>
+              <th className="py-3 px-3">Product Name</th>
+              <th className="py-3 px-3">SKU Code</th>
+              <th className="py-3 px-3 text-right">Retail MRP</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y-2 divide-slate-200">
+            {products.map((p) => (
+              <tr key={p.id}>
+                <td className="py-3 px-3 text-center font-mono font-black text-slate-900">#{p.itemNo}</td>
+                <td className="py-3 px-3 font-extrabold text-slate-950 text-base">{p.name}</td>
+                <td className="py-3 px-3 font-mono font-bold text-slate-700">{p.sku}</td>
+                <td className="py-3 px-3 text-right font-black font-mono text-slate-950 text-base">{formatINR(p.retailPrice)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// --- SETTINGS & BACKUP PAGE ---
+function SettingsPage({ settings, db, refreshData, showToast, seedAllRealCatalogs }) {
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <h2 className="text-2xl md:text-3xl font-black text-slate-950">⚙️ Store Settings &amp; Data Management</h2>
+      <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 space-y-5 shadow-sm">
+        <h3 className="font-extrabold text-base border-b-2 pb-3 text-slate-950">🔄 Reload All Wholesale Data</h3>
+        <p className="text-xs md:text-sm font-bold text-slate-600">Reload Big Toys (37 items) &amp; Small Toys (131 items) wholesale records into offline browser storage.</p>
+        <button onClick={seedAllRealCatalogs} className="py-3.5 px-7 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-xs md:text-sm shadow-md transition-all">
+          Reload All 168 Products
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PriceManagerPage({ products, suppliers, refreshData, showToast }) {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl md:text-3xl font-black text-slate-950">💰 Bulk Price Manager</h2>
+      <p className="text-xs md:text-sm font-bold text-slate-600">Managing retail pricing for {products.length} products</p>
+    </div>
+  );
+}
+
+function SuppliersPage({ suppliers, products }) {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl md:text-3xl font-black text-slate-950">🏪 Suppliers Directory</h2>
+      <div className="grid grid-cols-2 gap-4">
+        {suppliers.map(s => (
+          <div key={s.id} className="bg-white p-6 rounded-3xl border-2 border-slate-200 shadow-sm">
+            <h4 className="font-black text-base text-slate-950">{s.name}</h4>
+            <p className="text-xs font-bold text-slate-600 mt-1">{s.address}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProductDetailModal({ product, onClose, onEdit, onDelete, onPrintTag }) {
+  return (
+    <Modal title={`Product #${product.itemNo}: ${product.name}`} onClose={onClose}>
+      <div className="space-y-4">
+        <div className="p-5 bg-slate-50 rounded-2xl border-2 text-sm">
+          <p className="font-extrabold text-slate-950 text-base">{product.name} ({product.catalogTag})</p>
+          <p className="text-slate-600 font-mono font-bold mt-1">SKU: {product.sku}</p>
+        </div>
+        <div className="grid grid-cols-3 gap-3 text-center font-mono">
+          <div className="p-4 bg-slate-100 rounded-2xl border">
+            <p className="text-xs text-slate-600 font-bold">Wholesale Rate</p>
+            <p className="font-black text-slate-950 text-base mt-1">{formatINR(product.wholesalePrice)}</p>
+          </div>
+          <div className="p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-300">
+            <p className="text-xs text-emerald-800 font-extrabold">Retail Price</p>
+            <p className="font-black text-emerald-700 text-lg mt-1">{formatINR(product.retailPrice)}</p>
+          </div>
+          <div className="p-4 bg-amber-50 rounded-2xl border-2 border-amber-300">
+            <p className="text-xs text-amber-800 font-extrabold">Profit Margin</p>
+            <p className="font-black text-amber-700 text-base mt-1">{formatINR(product.retailPrice - product.wholesalePrice)}</p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 pt-3">
+          <button onClick={onPrintTag} className="py-3 px-4 bg-slate-100 text-slate-900 rounded-2xl text-xs font-extrabold border-2">🏷️ Print Price Tag</button>
+          <button onClick={onEdit} className="py-3 px-6 bg-emerald-600 text-white rounded-2xl text-xs font-black shadow-md">✏️ Edit Product</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function Modal({ title, onClose, children }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+      <div className="bg-white border-2 border-slate-300 rounded-3xl w-full max-w-lg shadow-2xl p-6 md:p-8 space-y-5">
+        <div className="flex items-center justify-between border-b-2 pb-4">
+          <h3 className="font-extrabold text-lg text-slate-950">{title}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-900 text-xl font-black">✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
