@@ -57,36 +57,101 @@
   <script src="./js/seedData.js"></script>
   <script src="./js/db.js"></script>
 
-  <!-- EMERGENCY GLOBAL FALLBACK HELPERS -->
+  <!-- FULL SELF-CONTAINED INDEXEDDB ENGINE & HELPERS -->
   <script>
-    if (!window.formatINR) {
-      window.formatINR = function(amount) {
-        if (amount === null || amount === undefined || isNaN(amount)) return '₹0';
-        const num = Math.round(amount * 100) / 100;
-        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(num);
-      };
-    }
-    if (!window.calculatePrices) {
-      window.calculatePrices = function(wholesalePrice, additionalCost, pricingMethod, markupPercent, marginPercent, manualRetailPrice, roundingMethod) {
-        const wholesale = parseFloat(wholesalePrice) || 0;
-        const extraCost = parseFloat(additionalCost) || 0;
-        const totalCost = wholesale + extraCost;
-        let calculatedPrice = totalCost;
-        const percent = parseFloat(marginPercent) || 0;
-        calculatedPrice = percent >= 100 ? totalCost * 2 : totalCost / (1 - percent / 100);
-        let suggestedRetailPrice = Math.round(calculatedPrice / 5) * 5;
-        const finalRetailPrice = pricingMethod === 'manual' ? Math.max(0, parseFloat(manualRetailPrice) || 0) : suggestedRetailPrice;
-        const profit = finalRetailPrice - totalCost;
-        return {
-          wholesale, extraCost, totalCost, calculatedPrice: Math.round(calculatedPrice * 100) / 100,
-          suggestedRetailPrice, finalRetailPrice, profit: Math.round(profit * 100) / 100,
-          actualMarginPercent: finalRetailPrice > 0 ? Math.round(((profit / finalRetailPrice) * 100) * 100) / 100 : 0,
-          actualMarkupPercent: totalCost > 0 ? Math.round(((profit / totalCost) * 100) * 100) / 100 : 0
+    (function() {
+      if (typeof Dexie !== 'undefined' && (!window.db || typeof window.db.products === 'undefined')) {
+        const db = new Dexie('KartarSportsDB');
+        db.version(4).stores({
+          products: '++id, catalogTag, itemNo, name, sku, category, brand, supplierId, retailPrice, wholesalePrice, currentQuantity, minStockAlert, updatedAt',
+          suppliers: '++id, name, phone, address',
+          settings: 'key, value',
+          revisions: '++id, revId, timestamp, note, totalProducts, totalWholesaleCost, totalRetailVal, snapshotData'
+        });
+        window.db = db;
+      }
+
+      if (!window.formatINR) {
+        window.formatINR = function(amount) {
+          if (amount === null || amount === undefined || isNaN(amount)) return '₹0';
+          const num = Math.round(amount * 100) / 100;
+          return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(num);
         };
-      };
-    }
-    if (!window.syncToPhysicalFile) { window.syncToPhysicalFile = async function() {}; }
-    if (!window.initDatabaseIfNeeded) { window.initDatabaseIfNeeded = async function() {}; }
+      }
+
+      if (!window.calculatePrices) {
+        window.calculatePrices = function(wholesalePrice, additionalCost, pricingMethod, markupPercent, marginPercent, manualRetailPrice, roundingMethod) {
+          const wholesale = parseFloat(wholesalePrice) || 0;
+          const extraCost = parseFloat(additionalCost) || 0;
+          const totalCost = wholesale + extraCost;
+          let calculatedPrice = totalCost;
+          const percent = parseFloat(marginPercent) || 0;
+          calculatedPrice = percent >= 100 ? totalCost * 2 : totalCost / (1 - percent / 100);
+          let suggestedRetailPrice = Math.round(calculatedPrice / 5) * 5;
+          const finalRetailPrice = pricingMethod === 'manual' ? Math.max(0, parseFloat(manualRetailPrice) || 0) : suggestedRetailPrice;
+          const profit = finalRetailPrice - totalCost;
+          return {
+            wholesale, extraCost, totalCost, calculatedPrice: Math.round(calculatedPrice * 100) / 100,
+            suggestedRetailPrice, finalRetailPrice, profit: Math.round(profit * 100) / 100,
+            actualMarginPercent: finalRetailPrice > 0 ? Math.round(((profit / finalRetailPrice) * 100) * 100) / 100 : 0,
+            actualMarkupPercent: totalCost > 0 ? Math.round(((profit / totalCost) * 100) * 100) / 100 : 0
+          };
+        };
+      }
+
+      if (!window.syncToPhysicalFile) {
+        window.syncToPhysicalFile = async function() {
+          try {
+            if (!window.db) return;
+            const products = await window.db.products.toArray();
+            const suppliers = await window.db.suppliers.toArray();
+            const rawRevisions = await window.db.revisions.toArray();
+            const revisionIndex = rawRevisions.map(r => ({ revId: r.revId, timestamp: r.timestamp, note: r.note, totalProducts: r.totalProducts, totalWholesaleCost: r.totalWholesaleCost, totalRetailVal: r.totalRetailVal }));
+            const dbPayload = { version: 'KartarSportsDB_v4', updatedAt: new Date().toISOString(), products, suppliers, revisions: revisionIndex };
+            const jsonStr = JSON.stringify(dbPayload, null, 2);
+            localStorage.setItem('kartar_master_db_backup', jsonStr);
+            try { await fetch('http://localhost:3001/api/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: jsonStr }); } catch (e) {}
+          } catch (e) {}
+        };
+      }
+
+      if (!window.importPhysicalData) {
+        window.importPhysicalData = async function(data) {
+          if (!data || !data.products || !Array.isArray(data.products) || !window.db) return;
+          await window.db.products.clear();
+          await window.db.suppliers.clear();
+          for (const p of data.products) { const { id, ...rest } = p; await window.db.products.add(rest); }
+          if (data.suppliers && Array.isArray(data.suppliers)) { for (const s of data.suppliers) { const { id, ...rest } = s; await window.db.suppliers.add(rest); } }
+          if (data.revisions && Array.isArray(data.revisions)) {
+            for (const r of data.revisions) {
+              const existing = await window.db.revisions.where('revId').equals(r.revId).first();
+              if (!existing) { const { id, ...rest } = r; await window.db.revisions.add(rest); }
+            }
+          }
+          await window.db.settings.put({ key: 'db_seeded_v4', value: 'true' });
+        };
+      }
+
+      if (!window.initDatabaseIfNeeded) {
+        window.initDatabaseIfNeeded = async function() {
+          if (!window.db) return;
+          let existingCount = await window.db.products.count();
+          let physicalData = null;
+          try { const res = await fetch('http://localhost:3001/api/db'); if (res.ok) physicalData = await res.json(); } catch (err) {
+            try { const res = await fetch('data/database_file.json'); if (res.ok) physicalData = await res.json(); } catch (e) {}
+          }
+          if (physicalData && physicalData.products && Array.isArray(physicalData.products)) {
+            if (existingCount === 0 || existingCount !== physicalData.products.length) {
+              await window.importPhysicalData(physicalData);
+              return;
+            }
+          }
+          if (existingCount > 0) return;
+          let localBackup = localStorage.getItem('kartar_master_db_backup');
+          if (localBackup) { try { await window.importPhysicalData(JSON.parse(localBackup)); } catch (e) {} }
+        };
+      }
+    })();
   </script>
 
   <style>
