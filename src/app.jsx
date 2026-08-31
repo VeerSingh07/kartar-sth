@@ -650,53 +650,50 @@ function PriceCheckerPage({ products, selectedCatalog, setSelectedCatalog, setSe
     <div className="space-y-6 max-w-6xl mx-auto">
       
       {/* HEADER BANNER */}
-      <div className="bg-gradient-to-r from-emerald-600 to-emerald-800 text-white rounded-3xl p-6 md:p-8 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-3 py-1 bg-white/20 text-white rounded-full text-xs font-black uppercase tracking-wider">
-              🏷️ Retail Counter Mode
-            </span>
-            <span className="text-xs text-emerald-200 font-bold">• Kartar Sports &amp; Toys</span>
-          </div>
-          <h2 className="text-3xl md:text-4xl font-black tracking-tight">Product Retail Price Checker</h2>
-          <p className="text-sm font-extrabold text-emerald-100 mt-1">Search by Product S.N. (#1, #127), SKU (BIG1, SML127), or Name</p>
+      <div className="bg-gradient-to-r from-emerald-600 to-emerald-800 text-white rounded-3xl p-6 md:p-8 shadow-xl">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="px-3 py-1 bg-white/20 text-white rounded-full text-xs font-black uppercase tracking-wider">
+            🏷️ Retail Counter Mode
+          </span>
+          <span className="text-xs text-emerald-200 font-bold">• Kartar Sports &amp; Toys</span>
         </div>
-
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setSearchTerm('')}
-            className="py-3 px-5 bg-white/20 hover:bg-white/30 text-white font-extrabold rounded-2xl text-xs md:text-sm transition-all"
-          >
-            🧹 Clear Search
-          </button>
-          <button 
-            onClick={() => setAppMode('admin')}
-            className="py-3 px-5 bg-slate-950 hover:bg-slate-900 text-white font-extrabold rounded-2xl text-xs md:text-sm border-2 border-emerald-400/30 transition-all shadow-md"
-          >
-            🛠️ Admin Mode
-          </button>
-        </div>
+        <h2 className="text-3xl md:text-4xl font-black tracking-tight">Product Retail Price Checker</h2>
+        <p className="text-sm font-extrabold text-emerald-100 mt-1">Search by Product S.N. (#1, #127), SKU (BIG1, SML127), or Name</p>
       </div>
 
-      {/* GIANT SEARCH BAR */}
-      <div className="relative shadow-xl rounded-3xl">
-        <span className="absolute inset-y-0 left-5 flex items-center text-emerald-600 text-2xl pointer-events-none">🔍</span>
-        <input 
-          ref={searchInputRef}
-          type="text" 
-          placeholder="Type Product S.N. (#1, #20, #127), SKU (BIG1, SML127), or Item Name..." 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-14 pr-6 py-5 bg-white border-4 border-emerald-500 rounded-3xl text-lg md:text-xl font-black text-slate-950 shadow-inner focus:outline-none focus:ring-4 focus:ring-emerald-200 transition-all"
-        />
-        {searchTerm && (
-          <button 
-            onClick={() => setSearchTerm('')}
-            className="absolute inset-y-0 right-5 flex items-center text-slate-400 hover:text-slate-800 text-2xl font-black"
-          >
-            ✕
-          </button>
-        )}
+      {/* GIANT SEARCH BAR WITH CLEAR BUTTON NEXT TO IT */}
+      <div className="flex flex-col sm:flex-row items-stretch gap-3">
+        <div className="relative flex-1 shadow-xl rounded-3xl">
+          <span className="absolute inset-y-0 left-5 flex items-center text-emerald-600 text-2xl pointer-events-none">🔍</span>
+          <input 
+            ref={searchInputRef}
+            type="text" 
+            placeholder="Type Product S.N. (#1, #20, #127), SKU (BIG1, SML127), or Item Name..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-14 pr-12 py-5 bg-white border-4 border-emerald-500 rounded-3xl text-lg md:text-xl font-black text-slate-950 shadow-inner focus:outline-none focus:ring-4 focus:ring-emerald-200 transition-all"
+          />
+          {searchTerm && (
+            <button 
+              onClick={() => setSearchTerm('')}
+              className="absolute inset-y-0 right-4 flex items-center text-slate-400 hover:text-slate-800 text-xl font-black"
+              title="Clear text"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <button 
+          onClick={() => setSearchTerm('')}
+          disabled={!searchTerm}
+          className={`py-5 px-6 font-black rounded-3xl text-base transition-all shadow-lg flex items-center justify-center gap-2 whitespace-nowrap border-2 ${
+            searchTerm 
+              ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-500 cursor-pointer active:scale-95' 
+              : 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed'
+          }`}
+        >
+          🧹 Clear Search
+        </button>
       </div>
 
       {/* CATALOG FILTER TABS & VIEW TOGGLE SWITCHER */}
@@ -894,12 +891,6 @@ function DashboardPage({ metrics, products, selectedCatalog, setSelectedCatalog,
             className="py-3.5 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs md:text-sm flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all"
           >
             ➕ Add New Product
-          </button>
-          <button 
-            onClick={seedAllRealCatalogs}
-            className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-900 font-extrabold rounded-2xl text-xs md:text-sm border-2 border-slate-300 transition-all"
-          >
-            🔄 Reset Data
           </button>
         </div>
       </div>
