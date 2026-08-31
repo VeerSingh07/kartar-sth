@@ -60,8 +60,43 @@
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 
   <!-- STANDALONE MODULAR DATA & DATABASE SCRIPTS -->
-  <script src="js/seedData.js"></script>
-  <script src="js/db.js"></script>
+  <script src="./js/seedData.js"></script>
+  <script src="./js/db.js"></script>
+
+  <!-- EMERGENCY GLOBAL FALLBACK HELPERS -->
+  <script>
+    if (!window.formatINR) {
+      window.formatINR = function(amount) {
+        if (amount === null || amount === undefined || isNaN(amount)) return '₹0';
+        const num = Math.round(amount * 100) / 100;
+        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(num);
+      };
+    }
+    if (!window.calculatePrices) {
+      window.calculatePrices = function(wholesalePrice, additionalCost, pricingMethod, markupPercent, marginPercent, manualRetailPrice, roundingMethod) {
+        const wholesale = parseFloat(wholesalePrice) || 0;
+        const extraCost = parseFloat(additionalCost) || 0;
+        const totalCost = wholesale + extraCost;
+        let calculatedPrice = totalCost;
+        const percent = parseFloat(marginPercent) || 0;
+        calculatedPrice = percent >= 100 ? totalCost * 2 : totalCost / (1 - percent / 100);
+        let suggestedRetailPrice = Math.round(calculatedPrice / 5) * 5;
+        const finalRetailPrice = pricingMethod === 'manual' ? Math.max(0, parseFloat(manualRetailPrice) || 0) : suggestedRetailPrice;
+        const profit = finalRetailPrice - totalCost;
+        return {
+          wholesale, extraCost, totalCost, calculatedPrice: Math.round(calculatedPrice * 100) / 100,
+          suggestedRetailPrice, finalRetailPrice, profit: Math.round(profit * 100) / 100,
+          actualMarginPercent: finalRetailPrice > 0 ? Math.round(((profit / finalRetailPrice) * 100) * 100) / 100 : 0,
+          actualMarkupPercent: totalCost > 0 ? Math.round(((profit / totalCost) * 100) * 100) / 100 : 0
+        };
+      };
+    }
+    if (!window.syncToPhysicalFile) { window.syncToPhysicalFile = async function() {}; }
+    if (!window.initDatabaseIfNeeded) { window.initDatabaseIfNeeded = async function() {}; }
+    if (!window.createRevisionSnapshot) { window.createRevisionSnapshot = async function() { return { revId: 'REV-000' }; }; }
+    if (!window.getRevisionHistory) { window.getRevisionHistory = async function() { return []; }; }
+    if (!window.loadRevisionSnapshot) { window.loadRevisionSnapshot = async function() { return null; }; }
+  </script>
 
   <style>
     ::-webkit-scrollbar {
