@@ -53,6 +53,10 @@
   <!-- Dexie.js (IndexedDB wrapper) -->
   <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
 
+  <!-- STANDALONE MODULAR DATA & DATABASE SCRIPTS -->
+  <script src="js/seedData.js"></script>
+  <script src="js/db.js"></script>
+
   <style>
     ::-webkit-scrollbar {
       width: 8px;
@@ -98,134 +102,6 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
 
-    // --- INDEXEDDB DATABASE SETUP ---
-    const db = new Dexie('KartarSportsDB');
-    db.version(3).stores({
-      products: '++id, catalogTag, itemNo, name, sku, category, brand, supplierId, retailPrice, wholesalePrice, currentQuantity, minStockAlert, updatedAt',
-      suppliers: '++id, name, phone, address',
-      settings: 'key, value'
-    });
-
-    // --- DEFAULT SETTINGS ---
-    const DEFAULT_APP_SETTINGS = {
-      shopName: 'Kartar Sports and Toys House',
-      shopAddress: 'Main Market, Sports Hub, City Center',
-      shopPhone: '+91 98765 43210',
-      currency: '₹'
-    };
-
-    // --- BIG TOYS CATALOG (37 ITEMS FROM CHALLAN SL1-56,701 DATED 26/AUG/2026) ---
-    const BIG_TOYS_PRODUCTS = [
-      { itemNo: 1, name: 'T/CHAIR (C)', sku: 'BIG1', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'Generic', wholesalePrice: 390, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 520, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 2, name: 'CARROM T/ZONE SMALL', sku: 'BIG2', catalogTag: 'Big Toys', category: 'Board Games', brand: 'T/ZONE', wholesalePrice: 250, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 335, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 3, name: 'RAIRA 040 MUSICAL TOYZOY', sku: 'BIG3', catalogTag: 'Big Toys', category: 'Educational Toys', brand: 'TOYZOY', wholesalePrice: 610, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 815, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 4, name: 'BATH TUB BHASIN', sku: 'BIG4', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'BHASIN', wholesalePrice: 500, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 670, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 5, name: 'TENT BHASIN.', sku: 'BIG5', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'BHASIN', wholesalePrice: 485, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 650, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 6, name: 'TENT S/C SQUARE', sku: 'BIG6', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'Generic', wholesalePrice: 390, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 520, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 7, name: 'P WAGON RIDER PANDA', sku: 'BIG7', catalogTag: 'Big Toys', category: 'Cars', brand: 'PANDA', wholesalePrice: 1175, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1570, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 8, name: 'CARRY COT 10 IN 1 FIRST CRAWL', sku: 'BIG8', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'FIRST CRAWL', wholesalePrice: 920, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1230, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 9, name: 'MICKEY RIDER MAMA LOVE', sku: 'BIG9', catalogTag: 'Big Toys', category: 'Cars', brand: 'MAMA LOVE', wholesalePrice: 590, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 790, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 10, name: 'PRAM GIAN C/W', sku: 'BIG10', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'GIAN', wholesalePrice: 1475, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1970, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 11, name: 'PRAM KARTZ PLAIN', sku: 'BIG11', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'KARTZ', wholesalePrice: 2250, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 3000, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 12, name: 'BIG REW GYAN', sku: 'BIG12', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'GYAN', wholesalePrice: 1025, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1370, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 13, name: 'TRICYCLE 551 TOYZOY', sku: 'BIG13', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'TOYZOY', wholesalePrice: 1300, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1735, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 14, name: 'TRICYCLE 552 TOYZOY', sku: 'BIG14', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'TOYZOY', wholesalePrice: 1560, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 2080, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 15, name: 'TRICYCLE 0001 TOYZOY', sku: 'BIG15', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'TOYZOY', wholesalePrice: 785, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1050, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 16, name: 'TRICYCLE 0002 TOYZOY', sku: 'BIG16', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'TOYZOY', wholesalePrice: 1025, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1370, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 17, name: 'CYCLE BULLET SKY INDIA B/W', sku: 'BIG17', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'SKY INDIA', wholesalePrice: 775, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1035, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 18, name: 'B/JHULLA A/W MINI', sku: 'BIG18', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'A/W', wholesalePrice: 675, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 900, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 19, name: 'B/JHULLA A/W SR', sku: 'BIG19', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'A/W', wholesalePrice: 975, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1300, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 20, name: 'SWING CHEAP LKW', sku: 'BIG20', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'LKW', wholesalePrice: 150, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 200, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 21, name: 'SWING ECO', sku: 'BIG21', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'ECO', wholesalePrice: 250, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 335, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 22, name: 'WALKER TINY MAMALOVE', sku: 'BIG22', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'MAMALOVE', wholesalePrice: 925, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1235, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 23, name: 'M/CAR 4006 TOYZOY', sku: 'BIG23', catalogTag: 'Big Toys', category: 'Cars', brand: 'TOYZOY', wholesalePrice: 835, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1115, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 24, name: 'WALKER 8 BAND GRIP TUTY MUSIC MAMALOVE', sku: 'BIG24', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'MAMALOVE', wholesalePrice: 330, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 440, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 25, name: 'SINGHAM WALKER 8 BAND GAJNI (M)', sku: 'BIG25', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'GAJNI', wholesalePrice: 375, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 500, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 26, name: 'WALKER KAT CAPSULE PIPE MAMALOVE', sku: 'BIG26', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'MAMALOVE', wholesalePrice: 390, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 520, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 27, name: 'CHETAK ROYAL', sku: 'BIG27', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'ROYAL', wholesalePrice: 430, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 575, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 28, name: 'QUACK PLAYWAY', sku: 'BIG28', catalogTag: 'Big Toys', category: 'Educational Toys', brand: 'PLAYWAY', wholesalePrice: 590, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 790, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 29, name: 'BOLT BIKE PANDA', sku: 'BIG29', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'PANDA', wholesalePrice: 1860, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 2480, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 30, name: 'CHUCHU HEAVY', sku: 'BIG30', catalogTag: 'Big Toys', category: 'Baby Toys', brand: 'Generic', wholesalePrice: 240, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 320, roundingMethod: 'nearest5', quantityPurchased: 4, currentQuantity: 4, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 31, name: 'RUNNER T/Z 2 NO.', sku: 'BIG31', catalogTag: 'Big Toys', category: 'Outdoor Toys', brand: 'T/Z', wholesalePrice: 930, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1240, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 32, name: 'BULLET RETRO ENFIELD LUUSA', sku: 'BIG32', catalogTag: 'Big Toys', category: 'Remote Control Toys', brand: 'LUUSA', wholesalePrice: 6500, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 8670, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 33, name: 'VESPA URBAN', sku: 'BIG33', catalogTag: 'Big Toys', category: 'Remote Control Toys', brand: 'URBAN', wholesalePrice: 4050, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 5400, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 34, name: 'BIKE HARLEY BUCKETS PLAYTOOL', sku: 'BIG34', catalogTag: 'Big Toys', category: 'Remote Control Toys', brand: 'PLAYTOOL', wholesalePrice: 2650, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 3535, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 35, name: 'JEEP 5005 4X4', sku: 'BIG35', catalogTag: 'Big Toys', category: 'Remote Control Toys', brand: '4X4', wholesalePrice: 4100, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 5470, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 36, name: 'JEEP HAIZER PLAYTOOL', sku: 'BIG36', catalogTag: 'Big Toys', category: 'Remote Control Toys', brand: 'PLAYTOOL', wholesalePrice: 5500, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 7335, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 },
-      { itemNo: 37, name: 'TRACTOR WITH TROLLY BIG', sku: 'BIG37', catalogTag: 'Big Toys', category: 'Remote Control Toys', brand: 'Generic', wholesalePrice: 8800, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 11735, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 1 }
-    ];
-
-    // --- SMALL TOYS CATALOG (131 ITEMS FROM ESTIMATE SLM-0 DATED 26/AUG/2026 INCL 5 ADDED ITEMS) ---
-    const SMALL_TOYS_PRODUCTS = [
-      { itemNo: 1, name: 'Melody Toy', sku: 'SML1', catalogTag: 'Small Toys', category: 'Musical Toys', brand: 'Generic', wholesalePrice: 145, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 195, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 2, name: 'Beach Set', sku: 'SML2', catalogTag: 'Small Toys', category: 'Outdoor Toys', brand: 'Generic', wholesalePrice: 375, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 500, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 3, name: 'Small Toy Car', sku: 'SML3', catalogTag: 'Small Toys', category: 'Cars', brand: 'Generic', wholesalePrice: 350, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 470, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 4, name: 'Play Gym Set', sku: 'SML4', catalogTag: 'Small Toys', category: 'Baby Toys', brand: 'Generic', wholesalePrice: 455, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 610, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 5, name: 'Soft Toy Dog', sku: 'SML5', catalogTag: 'Small Toys', category: 'Soft Toys', brand: 'Generic', wholesalePrice: 220, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 295, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 6, name: 'Action Car', sku: 'SML6', catalogTag: 'Small Toys', category: 'Cars', brand: 'Generic', wholesalePrice: 535, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 715, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 7, name: 'Cute Rabbit Toy', sku: 'SML7', catalogTag: 'Small Toys', category: 'Soft Toys', brand: 'Generic', wholesalePrice: 145, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 195, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 8, name: 'Puppy Dog Toy', sku: 'SML8', catalogTag: 'Small Toys', category: 'Soft Toys', brand: 'Generic', wholesalePrice: 155, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 210, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 9, name: 'Mini Racing Car', sku: 'SML9', catalogTag: 'Small Toys', category: 'Cars', brand: 'Generic', wholesalePrice: 145, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 195, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 10, name: 'J.C.B Dumper Toy', sku: 'SML10', catalogTag: 'Small Toys', category: 'Educational Toys', brand: 'Generic', wholesalePrice: 600, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 800, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 11, name: 'Rabbit Frog Toy', sku: 'SML11', catalogTag: 'Small Toys', category: 'Soft Toys', brand: 'Generic', wholesalePrice: 230, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 310, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 12, name: 'King Lion Toy', sku: 'SML12', catalogTag: 'Small Toys', category: 'Soft Toys', brand: 'Generic', wholesalePrice: 150, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 200, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 13, name: 'Rock Car Stunt Toy', sku: 'SML13', catalogTag: 'Small Toys', category: 'Remote Control Toys', brand: 'Generic', wholesalePrice: 435, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 580, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 14, name: 'Speed Car Toy', sku: 'SML14', catalogTag: 'Small Toys', category: 'Cars', brand: 'Generic', wholesalePrice: 500, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 670, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 15, name: 'Jelly Fish Toy', sku: 'SML15', catalogTag: 'Small Toys', category: 'Other Toys', brand: 'Generic', wholesalePrice: 120, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 160, roundingMethod: 'nearest5', quantityPurchased: 6, currentQuantity: 6, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 16, name: 'Doraemon Toy', sku: 'SML16', catalogTag: 'Small Toys', category: 'Action Figures', brand: 'Generic', wholesalePrice: 65, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 90, roundingMethod: 'nearest5', quantityPurchased: 12, currentQuantity: 12, minStockAlert: 2, supplierId: 2 },
-      { itemNo: 17, name: 'Stunt Bike Toy', sku: 'SML17', catalogTag: 'Small Toys', category: 'Remote Control Toys', brand: 'Generic', wholesalePrice: 880, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 1175, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 18, name: 'Smart Robot Toy', sku: 'SML18', catalogTag: 'Small Toys', category: 'Educational Toys', brand: 'Generic', wholesalePrice: 390, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 520, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 19, name: 'Dinosaur Figure', sku: 'SML19', catalogTag: 'Small Toys', category: 'Action Figures', brand: 'Generic', wholesalePrice: 210, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 280, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 20, name: '3D Light Car', sku: 'SML20', catalogTag: 'Small Toys', category: 'Cars', brand: 'Generic', wholesalePrice: 165, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 220, roundingMethod: 'nearest5', quantityPurchased: 2, currentQuantity: 2, minStockAlert: 1, supplierId: 2 },
-      ...Array.from({ length: 106 }, (_, idx) => {
-        const num = idx + 21;
-        const rates = [175, 280, 250, 875, 250, 75, 530, 390, 825, 580, 480, 265, 205, 600, 190, 410, 275, 175, 430, 500, 285, 165, 245, 350, 325, 250, 105, 63, 27, 335, 335, 125, 65, 60, 28, 25, 150, 145, 105, 175, 60, 155, 275, 135, 270, 260, 66, 180, 115, 45, 55, 85, 75, 60, 110, 60, 105, 75, 68, 75, 48, 35, 50, 55, 60, 55, 60, 195, 120, 95, 95, 75, 60, 48, 33, 110, 115, 57, 75, 85, 120, 90, 80, 90, 75, 72, 70, 100, 100, 75, 95, 75, 10, 185, 300, 195, 290, 320, 180, 220, 90, 215, 70, 590, 300, 215];
-        const qtys = [2, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 3, 2, 1, 1, 1, 2, 2, 1, 1, 1, 2, 6, 12, 1, 1, 2, 2, 6, 2, 2, 1, 1, 2, 3, 1, 4, 2, 2, 2, 2, 3, 1, 2, 2, 2, 2, 2, 2, 1, 2, 1, 2, 2, 2, 1, 2, 4, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 1, 1, 4, 1, 2, 1, 1, 2, 1, 2, 2, 1, 2, 1, 1, 2];
-        const wPrice = rates[idx] || 100;
-        const qVal = qtys[idx] || 1;
-        const rPrice = Math.round((wPrice / 0.75) / 5) * 5;
-
-        return {
-          itemNo: num,
-          name: `Small Toy #${String(num).padStart(3, '0')}`,
-          sku: `SML${num}`,
-          catalogTag: 'Small Toys',
-          category: 'Small Toys',
-          brand: 'Generic',
-          wholesalePrice: wPrice,
-          additionalCost: 0,
-          pricingMethod: 'margin',
-          marginPercent: 25,
-          retailPrice: rPrice,
-          roundingMethod: 'nearest5',
-          quantityPurchased: qVal,
-          currentQuantity: qVal,
-          minStockAlert: 1,
-          supplierId: 2
-        };
-      }),
-      { itemNo: 127, name: 'Small Toy #127 (Special)', sku: 'SML127', catalogTag: 'Small Toys', category: 'Small Toys', brand: 'Generic', wholesalePrice: 370, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 495, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 128, name: 'Small Toy #128 (Special)', sku: 'SML128', catalogTag: 'Small Toys', category: 'Small Toys', brand: 'Generic', wholesalePrice: 225, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 300, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 129, name: 'Small Toy #129 (Special)', sku: 'SML129', catalogTag: 'Small Toys', category: 'Small Toys', brand: 'Generic', wholesalePrice: 315, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 420, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 130, name: 'Small Toy #130 (Special)', sku: 'SML130', catalogTag: 'Small Toys', category: 'Small Toys', brand: 'Generic', wholesalePrice: 310, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 415, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 },
-      { itemNo: 131, name: 'Previous Challan Subtotal Item (#005)', sku: 'SML131', catalogTag: 'Small Toys', category: 'Small Toys', brand: 'Generic', wholesalePrice: 38572, additionalCost: 0, pricingMethod: 'margin', marginPercent: 25, retailPrice: 51430, roundingMethod: 'nearest5', quantityPurchased: 1, currentQuantity: 1, minStockAlert: 1, supplierId: 2 }
-    ];
-
-    const DEFAULT_SUPPLIERS = [
-      { id: 1, name: 'Challan Big Toys Wholesale (SL1-56,701)', phone: '+91 98123 45678', address: 'Wholesale Sports & Big Toys Market' },
-      { id: 2, name: 'Estimate Small Toys Wholesale (SLM-0)', phone: '+91 98234 56789', address: 'Small Toys Wholesalers Hub' }
-    ];
-
-    function formatINR(amount) {
-      if (amount === null || amount === undefined || isNaN(amount)) return '₹0';
-      const num = Math.round(amount * 100) / 100;
-      return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 2
-      }).format(num);
-    }
-
     // --- MAIN INDEX PRICE CHECKER APPLICATION ---
     function App() {
       const [products, setProducts] = useState([]);
@@ -233,27 +109,26 @@
       const [loading, setLoading] = useState(true);
       const [selectedProduct, setSelectedProduct] = useState(null);
       const [priceTagModalOpen, setPriceTagModalOpen] = useState(false);
+      const [isFileConnected, setIsFileConnected] = useState(false);
 
       const refreshData = async () => {
         try {
           setLoading(true);
+          await window.initDatabaseIfNeeded();
           let prodList = await db.products.toArray();
-
-          if (prodList.length < 150 || prodList.some(p => p.sku && p.sku.includes('-'))) {
-            await db.products.clear();
-            await db.suppliers.clear();
-            for (const supp of DEFAULT_SUPPLIERS) await db.suppliers.add(supp);
-            const now = new Date('2026-08-26').toISOString();
-            for (const prod of BIG_TOYS_PRODUCTS) await db.products.add({ ...prod, createdAt: now, updatedAt: now });
-            for (const prod of SMALL_TOYS_PRODUCTS) await db.products.add({ ...prod, createdAt: now, updatedAt: now });
-            prodList = await db.products.toArray();
-          }
-
           setProducts(prodList);
         } catch (err) {
           console.error('Failed to load database:', err);
         } finally {
           setLoading(false);
+        }
+      };
+
+      const handleConnectDiskFile = async () => {
+        const connected = await window.connectPhysicalFile();
+        if (connected) {
+          setIsFileConnected(true);
+          await refreshData();
         }
       };
 
@@ -270,12 +145,14 @@
             setSelectedCatalog={setSelectedCatalog}
             setSelectedProduct={setSelectedProduct}
             setPriceTagModalOpen={setPriceTagModalOpen}
+            isFileConnected={isFileConnected}
+            handleConnectDiskFile={handleConnectDiskFile}
           />
 
           {priceTagModalOpen && selectedProduct && (
             <PriceTagModal
               product={selectedProduct}
-              settings={DEFAULT_APP_SETTINGS}
+              settings={window.DEFAULT_APP_SETTINGS}
               onClose={() => setPriceTagModalOpen(false)}
             />
           )}
@@ -293,7 +170,8 @@
 
     // --- RETAIL PRICE CHECKER PAGE ---
     function PriceCheckerPage({
-      products, selectedCatalog, setSelectedCatalog, setSelectedProduct, setPriceTagModalOpen
+      products, selectedCatalog, setSelectedCatalog, setSelectedProduct, setPriceTagModalOpen,
+      isFileConnected, handleConnectDiskFile
     }) {
       const [searchTerm, setSearchTerm] = useState('');
       const [viewMode, setViewMode] = useState('list');
@@ -342,7 +220,7 @@
                   }`}
               >
                 <span>📦 All Catalogs</span>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${selectedCatalog === 'ALL' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900'}`}>168</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${selectedCatalog === 'ALL' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900'}`}>{products.length}</span>
               </button>
 
               <button
@@ -353,7 +231,6 @@
                   }`}
               >
                 <span>🧸 Big Toys Catalog</span>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${selectedCatalog === 'Big Toys' ? 'bg-emerald-800 text-white' : 'bg-slate-200 text-slate-900'}`}>37</span>
               </button>
 
               <button
@@ -364,7 +241,6 @@
                   }`}
               >
                 <span>🪀 Small Toys Catalog</span>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${selectedCatalog === 'Small Toys' ? 'bg-emerald-800 text-white' : 'bg-slate-200 text-slate-900'}`}>131</span>
               </button>
             </div>
 
@@ -461,6 +337,9 @@
                         </td>
                         <td className="py-4 px-4 font-black text-slate-950 text-base md:text-lg">
                           {p.name}
+                          {p.currentQuantity === 0 && (
+                            <span className="ml-2 px-2 py-0.5 bg-rose-100 text-rose-800 border border-rose-300 rounded text-[10px] font-black uppercase">OUT OF STOCK</span>
+                          )}
                         </td>
                         <td className="py-4 px-4 font-mono text-xs font-bold text-slate-600">
                           {p.sku}
